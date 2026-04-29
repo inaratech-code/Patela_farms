@@ -46,7 +46,7 @@ export function FinanceSnapshot(props: {
         <HandCoins className="w-5 h-5 text-[#64748b]" />
       </div>
 
-      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="p-6 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {tiles.map((t) => {
           const Icon = t.icon;
           return (

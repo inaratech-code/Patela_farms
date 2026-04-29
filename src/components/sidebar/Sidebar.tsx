@@ -101,7 +101,7 @@ function MobileSidebarDrawer(props: { open: boolean; onClose: () => void }) {
             animate={{ x: 0 }}
             exit={{ x: -320 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute inset-y-0 left-0 w-72 bg-white border-r border-slate-200"
+            className="absolute inset-y-0 left-0 w-64 bg-white border-r border-slate-200"
           >
             <SidebarContent variant="mobile" onNavigate={props.onClose} />
           </motion.div>
@@ -149,8 +149,8 @@ function SidebarContent(props: { variant: "desktop" | "mobile"; onNavigate?: () 
       {}
     );
 
-    // Desktop default expanded; Mobile default collapsed.
-    setIsCollapsed(props.variant === "mobile" ? true : Boolean(existing.collapsed));
+    // Desktop default expanded; Mobile default expanded (labels visible).
+    setIsCollapsed(props.variant === "mobile" ? false : Boolean(existing.collapsed));
     // Always start dropdown groups collapsed. Users explicitly open them via click.
     setOpenGroups(defaultOpenGroups);
     // eslint-disable-next-line react-hooks/exhaustive-deps

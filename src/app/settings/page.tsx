@@ -121,10 +121,7 @@ export default function SettingsPage() {
           {syncStatus ? (
             <div className="text-sm text-slate-700">{syncStatus}</div>
           ) : (
-            <div className="text-xs text-slate-500">
-              Note: you must set <span className="font-mono">NEXT_PUBLIC_SUPABASE_URL</span> and{" "}
-              <span className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</span> in <span className="font-mono">.env.local</span>.
-            </div>
+            null
           )}
         </div>
       </div>

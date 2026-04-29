@@ -6,10 +6,6 @@ import dynamic from "next/dynamic";
 
 const Sparkline = dynamic(() => import("./_Sparkline").then((m) => m.Sparkline), { ssr: false });
 
-function formatRs(n: number) {
-  return `Rs. ${n.toLocaleString()}`;
-}
-
 function DeltaText(props: { deltaPct: number }) {
   const up = props.deltaPct >= 0;
   const value = Math.abs(props.deltaPct).toFixed(0);
@@ -41,7 +37,7 @@ export function StatsCards(props: { cards: StatCard[] }) {
         hidden: { opacity: 0 },
         show: { opacity: 1, transition: { staggerChildren: 0.06 } },
       }}
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
+      className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
     >
       {props.cards.map((c) => (
         <motion.div
