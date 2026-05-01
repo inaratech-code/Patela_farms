@@ -7,14 +7,19 @@ import { db, type DayBookEntry } from "@/lib/db";
 import { getOrCreateDefaultCashAccountId, sortAccountsForPicker, type PaymentMethod } from "@/lib/accounts";
 import { makeSyncEvent } from "@/lib/syncEvents";
 import { newUid } from "@/lib/uid";
+import { useRouter } from "next/navigation";
 
-const expenseCategories: Array<DayBookEntry["category"]> = ["Transport", "Wage", "Other", "Purchase"];
+const expenseCategories: Array<DayBookEntry["category"]> = ["Transport", "Wage", "Other"];
 
 export default function ExpensesPage() {
-  const entries = useLiveQuery(() => db.dayBook.where("type").equals("Expense").toArray()) || [];
+  const router = useRouter();
+  const entriesRaw = useLiveQuery(() => db.dayBook.where("type").equals("Expense").toArray());
   const financialAccounts = useLiveQuery(() => db.financialAccounts.toArray()) || [];
 
+  const entries = useMemo(() => (entriesRaw ?? []).filter((e) => e.category !== "Purchase"), [entriesRaw]);
+
   const [showForm, setShowForm] = useState(false);
+  const [showGate, setShowGate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
@@ -98,13 +103,54 @@ export default function ExpensesPage() {
           <div className="mt-1 text-sm text-slate-500">This month: Rs. {totalThisMonth.toLocaleString()}</div>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            if (showForm) return setShowForm(false);
+            setShowGate(true);
+          }}
           className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-5 h-5" />
           <span>{showForm ? "Cancel" : "Add Expense"}</span>
         </button>
       </div>
+
+      {showGate ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="text-lg font-semibold text-slate-900">Was this used to buy stock?</div>
+          <div className="mt-1 text-sm text-slate-500">
+            Purchases increase inventory. General expenses do not.
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90"
+              onClick={() => {
+                setShowGate(false);
+                router.push("/purchases?new=1");
+              }}
+            >
+              Yes, Purchase Stock
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700"
+              onClick={() => {
+                setShowGate(false);
+                setShowForm(true);
+              }}
+            >
+              No, General Expense
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-50"
+              onClick={() => setShowGate(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 space-y-4">

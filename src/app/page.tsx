@@ -23,24 +23,33 @@ function getOnlineServerSnapshot() {
 }
 
 export default function Dashboard() {
-  const inventory = useLiveQuery(() => db.inventory.toArray()) || [];
-  const dayBook = useLiveQuery(() => db.dayBook.toArray()) || [];
-  const ledgerAccounts = useLiveQuery(() => db.ledgerAccounts.toArray()) || [];
-  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.toArray()) || [];
+  const inventory = useLiveQuery(() => db.inventory.toArray());
+  const dayBook = useLiveQuery(() => db.dayBook.toArray());
+  const purchases = useLiveQuery(() => db.purchases.toArray());
+  const sales = useLiveQuery(() => db.sales.toArray());
+  const ledgerAccounts = useLiveQuery(() => db.ledgerAccounts.toArray());
+  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.toArray());
 
   const isOnline = useSyncExternalStore(subscribeOnlineStatus, getOnlineSnapshot, getOnlineServerSnapshot);
 
-  const totalStockUnits = inventory.reduce((acc, item) => acc + item.quantity, 0);
-  const lowStockCount = inventory.filter(i => i.quantity <= i.minStockThreshold).length;
-
   const todayKey = new Date().toISOString().split("T")[0];
-  const todaySales = dayBook
-    .filter((e) => e.category === "Sale" && e.type === "Income" && e.time.startsWith(todayKey))
+  const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+
+  const inventoryValue = (inventory ?? []).reduce((acc, item) => acc + item.quantity * (item.costPrice ?? 0), 0);
+
+  const purchasesThisMonth = (purchases ?? [])
+    .filter((p) => new Date(p.date).toISOString().slice(0, 7) === monthKey)
+    .reduce((acc, p) => acc + p.totalCost, 0);
+
+  const operatingExpensesThisMonth = (dayBook ?? [])
+    .filter((e) => e.type === "Expense" && e.category !== "Purchase" && e.time.startsWith(monthKey))
     .reduce((acc, e) => acc + e.amount, 0);
 
-  const revenue = dayBook
-    .filter((e) => e.category === "Sale" && e.type === "Income")
-    .reduce((acc, e) => acc + e.amount, 0);
+  const salesRevenueThisMonth = (sales ?? [])
+    .filter((s) => new Date(s.date).toISOString().slice(0, 7) === monthKey)
+    .reduce((acc, s) => acc + s.totalPrice, 0);
+
+  const netProfitThisMonth = salesRevenueThisMonth - purchasesThisMonth - operatingExpensesThisMonth;
 
   const yesterdayKey = (() => {
     const d = new Date();
@@ -48,15 +57,18 @@ export default function Dashboard() {
     return d.toISOString().split("T")[0];
   })();
 
-  const yesterdaySales = dayBook
-    .filter((e) => e.category === "Sale" && e.type === "Income" && e.time.startsWith(yesterdayKey))
-    .reduce((acc, e) => acc + e.amount, 0);
+  const todaySales = (sales ?? [])
+    .filter((s) => new Date(s.date).toISOString().split("T")[0] === todayKey)
+    .reduce((acc, s) => acc + s.totalPrice, 0);
 
-  const salesDeltaPct = yesterdaySales === 0 ? (todaySales > 0 ? 100 : 0) : ((todaySales - yesterdaySales) / yesterdaySales) * 100;
+  const yesterdaySales = (sales ?? [])
+    .filter((s) => new Date(s.date).toISOString().split("T")[0] === yesterdayKey)
+    .reduce((acc, s) => acc + s.totalPrice, 0);
 
-  const lowStockDeltaPct = 12; // placeholder until we track stock history snapshots
-  const totalStockDeltaPct = 6; // placeholder
-  const revenueDeltaPct = 8; // placeholder
+  const salesDeltaPct =
+    yesterdaySales === 0 ? (todaySales > 0 ? 100 : 0) : ((todaySales - yesterdaySales) / yesterdaySales) * 100;
+
+  // placeholder until we track stock history snapshots
 
   const salesByDay = useMemo(() => {
     const now = new Date();
@@ -70,19 +82,18 @@ export default function Dashboard() {
       result.push({ dayKey, label, total: 0 });
     }
     const index = new Map(result.map((r, idx) => [r.dayKey, idx]));
-    for (const e of dayBook) {
-      if (e.category !== "Sale" || e.type !== "Income") continue;
-      const key = e.time.split("T")[0];
+    for (const s of sales ?? []) {
+      const key = new Date(s.date).toISOString().split("T")[0];
       const i = index.get(key);
-      if (typeof i === "number") result[i] = { ...result[i], total: result[i].total + e.amount };
+      if (typeof i === "number") result[i] = { ...result[i], total: result[i].total + s.totalPrice };
     }
     return result;
-  }, [dayBook]);
+  }, [sales]);
 
   const spark7 = salesByDay.slice(-7).map((d) => ({ x: d.dayKey, y: d.total }));
 
   const lowStockItemsTop5 = useMemo(() => {
-    return inventory
+    return (inventory ?? [])
       .filter((i) => i.quantity <= i.minStockThreshold)
       .slice()
       .sort((a, b) => a.quantity - b.quantity)
@@ -90,7 +101,7 @@ export default function Dashboard() {
   }, [inventory]);
 
   const activityItems = useMemo(() => {
-    const tx = dayBook
+    const tx = (dayBook ?? [])
       .slice()
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       .slice(0, 6)
@@ -120,7 +131,7 @@ export default function Dashboard() {
 
   const finance = useMemo(() => {
     const sums = new Map<number, { debit: number; credit: number }>();
-    for (const e of ledgerEntries) {
+    for (const e of ledgerEntries ?? []) {
       const cur = sums.get(e.accountId) ?? { debit: 0, credit: 0 };
       cur.debit += e.debit;
       cur.credit += e.credit;
@@ -128,7 +139,7 @@ export default function Dashboard() {
     }
     let receivable = 0;
     let payable = 0;
-    for (const a of ledgerAccounts) {
+    for (const a of ledgerAccounts ?? []) {
       if (typeof a.id !== "number") continue;
       const s = sums.get(a.id) ?? { debit: 0, credit: 0 };
       const bal = s.debit - s.credit;
@@ -136,11 +147,11 @@ export default function Dashboard() {
       if (bal < 0) payable += Math.abs(bal);
     }
 
-    const expensesToday = dayBook
-      .filter((e) => e.type === "Expense" && e.time.startsWith(todayKey))
+    const expensesToday = (dayBook ?? [])
+      .filter((e) => e.type === "Expense" && e.category !== "Purchase" && e.time.startsWith(todayKey))
       .reduce((acc, e) => acc + e.amount, 0);
 
-    const cashInHand = dayBook.reduce((acc, e) => (e.type === "Income" ? acc + e.amount : acc - e.amount), 0);
+    const cashInHand = (dayBook ?? []).reduce((acc, e) => (e.type === "Income" ? acc + e.amount : acc - e.amount), 0);
 
     return { receivable, payable, expensesToday, cashInHand };
   }, [dayBook, ledgerAccounts, ledgerEntries, todayKey]);
@@ -148,47 +159,57 @@ export default function Dashboard() {
   const statCards = useMemo(() => {
     return [
       {
-        id: "stock",
-        title: "Total Stock",
-        value: `${totalStockUnits.toLocaleString()} units`,
-        deltaPct: totalStockDeltaPct,
+        id: "inventoryValue",
+        title: "Inventory Value",
+        value: `Rs. ${inventoryValue.toLocaleString()}`,
+        deltaPct: 0,
         icon: Package,
         iconBg: "bg-[#0871b3]/10",
         iconFg: "text-[#0871b3]",
         spark: spark7,
       },
       {
-        id: "lowStock",
-        title: "Low Stock Alerts",
-        value: `${lowStockCount.toLocaleString()} items`,
-        deltaPct: lowStockDeltaPct,
+        id: "purchasesMonth",
+        title: "Purchases This Month",
+        value: `Rs. ${purchasesThisMonth.toLocaleString()}`,
+        deltaPct: 0,
         icon: AlertTriangle,
         iconBg: "bg-amber-500/10",
         iconFg: "text-amber-700",
-        spark: spark7.map((p, idx) => ({ ...p, y: idx === 0 ? lowStockCount : Math.max(0, lowStockCount - (idx % 3)) })),
+        spark: spark7,
       },
       {
-        id: "todaySales",
-        title: "Today's Sales",
-        value: `Rs. ${todaySales.toLocaleString()}`,
-        deltaPct: salesDeltaPct,
+        id: "operatingExpenses",
+        title: "Operating Expenses",
+        value: `Rs. ${operatingExpensesThisMonth.toLocaleString()}`,
+        deltaPct: 0,
         icon: TrendingUp,
         iconBg: "bg-[#80a932]/12",
         iconFg: "text-[#80a932]",
         spark: spark7,
       },
       {
-        id: "revenue",
-        title: "Total Revenue",
-        value: `Rs. ${revenue.toLocaleString()}`,
-        deltaPct: revenueDeltaPct,
+        id: "salesRevenue",
+        title: "Sales Revenue",
+        value: `Rs. ${salesRevenueThisMonth.toLocaleString()}`,
+        deltaPct: salesDeltaPct,
         icon: IndianRupee,
         iconBg: "bg-[#0871b3]/10",
         iconFg: "text-[#0871b3]",
         spark: spark7,
       },
+      {
+        id: "netProfit",
+        title: "Net Profit",
+        value: `Rs. ${netProfitThisMonth.toLocaleString()}`,
+        deltaPct: 0,
+        icon: TrendingUp,
+        iconBg: "bg-[#80a932]/12",
+        iconFg: "text-[#80a932]",
+        spark: spark7,
+      },
     ];
-  }, [lowStockCount, revenue, revenueDeltaPct, salesDeltaPct, spark7, todaySales, totalStockUnits, totalStockDeltaPct, lowStockDeltaPct, todaySales, revenue]);
+  }, [inventoryValue, purchasesThisMonth, operatingExpensesThisMonth, salesRevenueThisMonth, netProfitThisMonth, salesDeltaPct, spark7]);
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -208,6 +229,31 @@ export default function Dashboard() {
         expensesToday={finance.expensesToday}
         cashInHand={finance.cashInHand}
       />
+
+      <div className="rounded-2xl bg-white border border-[#e2e8f0] shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-[#e2e8f0]">
+          <div className="text-sm font-medium text-[#64748b]">Monthly Report</div>
+          <div className="mt-1 text-lg font-semibold text-[#0f172a]">{monthKey}</div>
+        </div>
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+          <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+            <div className="text-xs font-semibold text-[#64748b]">Purchases</div>
+            <div className="mt-2 text-lg font-semibold text-[#0f172a]">Rs. {purchasesThisMonth.toLocaleString()}</div>
+          </div>
+          <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+            <div className="text-xs font-semibold text-[#64748b]">Expenses</div>
+            <div className="mt-2 text-lg font-semibold text-[#0f172a]">Rs. {operatingExpensesThisMonth.toLocaleString()}</div>
+          </div>
+          <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+            <div className="text-xs font-semibold text-[#64748b]">Sales</div>
+            <div className="mt-2 text-lg font-semibold text-[#0f172a]">Rs. {salesRevenueThisMonth.toLocaleString()}</div>
+          </div>
+          <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+            <div className="text-xs font-semibold text-[#64748b]">Profit</div>
+            <div className="mt-2 text-lg font-semibold text-[#0f172a]">Rs. {netProfitThisMonth.toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RecentActivity items={activityItems} />

@@ -7,7 +7,6 @@ import {
   Truck,
   Receipt,
   BookOpenText,
-  Landmark,
   Clock,
   Users,
   Bell,
@@ -47,7 +46,6 @@ export const sidebarGroups: SidebarGroupConfig[] = [
     icon: ShoppingCart,
     items: [
       { id: "sales", label: "Sales", href: "/orders", icon: ShoppingCart }, // route stays /orders
-      { id: "payments", label: "Payments", href: "/payments", icon: HandCoins },
       { id: "purchases", label: "Purchases", href: "/purchases", icon: Truck },
       { id: "expenses", label: "Expenses", href: "/expenses", icon: Receipt },
     ],
@@ -59,7 +57,7 @@ export const sidebarGroups: SidebarGroupConfig[] = [
     items: [
       { id: "ledger", label: "Ledger", href: "/ledger", icon: BookOpenText },
       { id: "dayBook", label: "Day Book", href: "/daybook", icon: Clock },
-      { id: "financialAccounts", label: "Accounts", href: "/accounts", icon: Landmark },
+      { id: "payments", label: "Payments", href: "/payments", icon: HandCoins },
     ],
   },
   {

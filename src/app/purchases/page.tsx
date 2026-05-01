@@ -5,25 +5,32 @@ import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import { addLedgerEntry, getOrCreateLedgerAccountId } from "@/lib/ledger";
-import { getOrCreateDefaultCashAccountId } from "@/lib/accounts";
+import { getOrCreateDefaultCashAccountId, sortAccountsForPicker, type PaymentMethod } from "@/lib/accounts";
 import { makeSyncEvent } from "@/lib/syncEvents";
 import { newUid } from "@/lib/uid";
+import { useSearchParams } from "next/navigation";
 
 export default function PurchasesPage() {
-  const inventory = useLiveQuery(() => db.inventory.toArray()) || [];
-  const purchases = useLiveQuery(() => db.purchases.toArray()) || [];
+  const inventory = useLiveQuery(() => db.inventory.toArray());
+  const purchases = useLiveQuery(() => db.purchases.toArray());
+  const financialAccounts = useLiveQuery(() => db.financialAccounts.toArray()) || [];
+  const searchParams = useSearchParams();
 
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(() => searchParams.get("new") === "1");
   const [purchaseForm, setPurchaseForm] = useState({
     supplierName: "",
     date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+    paymentType: "Due" as "Paid" | "Due",
+    method: "Cash" as PaymentMethod,
+    financialAccountId: 0,
     lineItemDraft: { itemId: 0, quantity: 1 },
     lineItems: [] as Array<{ itemId: number; quantity: number }>,
   });
 
   const purchaseTotal = useMemo(() => {
+    const list = inventory ?? [];
     return purchaseForm.lineItems.reduce((acc, li) => {
-      const item = inventory.find((i) => i.id === li.itemId);
+      const item = list.find((i) => i.id === li.itemId);
       const unitCost = item?.costPrice ?? 0;
       return acc + unitCost * li.quantity;
     }, 0);
@@ -61,11 +68,12 @@ export default function PurchasesPage() {
     if (!purchaseForm.supplierName.trim()) return alert("Supplier name is required.");
     if (purchaseForm.lineItems.length === 0) return alert("Add at least one item to purchase.");
 
+    const inv = inventory ?? [];
     const date = new Date(`${purchaseForm.date}T12:00:00`).toISOString();
     const supplierName = purchaseForm.supplierName.trim();
 
     const lineItemsResolved = purchaseForm.lineItems.map((li) => {
-      const item = inventory.find((i) => i.id === li.itemId);
+      const item = inv.find((i) => i.id === li.itemId);
       return { ...li, item };
     });
 
@@ -104,44 +112,49 @@ export default function PurchasesPage() {
         );
       }
 
-      const cashAccountId = await getOrCreateDefaultCashAccountId();
-      const cashAcct = await db.financialAccounts.get(cashAccountId);
-      const day = {
-        uid: newUid(),
-        time: date,
-        type: "Expense" as const,
-        category: "Purchase" as const,
-        amount: totalCost,
-        description,
-        method: "Cash" as const,
-        accountId: cashAccountId,
-      };
-      await db.dayBook.add(day);
-      await db.outbox.add(
-        makeSyncEvent({
-          entityType: "daybook.entry",
-          entityId: day.uid,
-          op: "create",
-          payload: { entry: { ...day, account: cashAcct?.uid ? { uid: cashAcct.uid, name: cashAcct.name, type: cashAcct.type } : null } },
-        })
-      );
-
-      const accountId = await getOrCreateLedgerAccountId({ name: supplierName, type: "Supplier" });
-      const ledgerEntryId = (await addLedgerEntry({ accountId, date, description, debit: 0, credit: totalCost })) as number;
-      const acct = await db.ledgerAccounts.get(accountId);
-      const entryRow = await db.ledgerEntries.get(ledgerEntryId);
-      if (acct?.uid && entryRow?.uid) {
+      // Accounting:
+      // - Paid: affects Day Book (selected account), no payable.
+      // - Due: creates payable in ledger, no Day Book cash impact.
+      if (purchaseForm.paymentType === "Paid") {
+        const accountId = Number(purchaseForm.financialAccountId) || (await getOrCreateDefaultCashAccountId());
+        const acct = await db.financialAccounts.get(accountId);
+        const day = {
+          uid: newUid(),
+          time: date,
+          type: "Expense" as const,
+          category: "Purchase" as const,
+          amount: totalCost,
+          description: `${description} (${purchaseForm.method})`,
+          method: purchaseForm.method,
+          accountId,
+        };
+        await db.dayBook.add(day);
         await db.outbox.add(
           makeSyncEvent({
-            entityType: "ledger.entry",
-            entityId: entryRow.uid,
+            entityType: "daybook.entry",
+            entityId: day.uid,
             op: "create",
-            payload: {
-              account: { uid: acct.uid, name: acct.name, type: acct.type },
-              entry: { uid: entryRow.uid, date: entryRow.date, description: entryRow.description, debit: entryRow.debit, credit: entryRow.credit },
-            },
+            payload: { entry: { ...day, account: acct?.uid ? { uid: acct.uid, name: acct.name, type: acct.type } : null } },
           })
         );
+      } else {
+        const accountId = await getOrCreateLedgerAccountId({ name: supplierName, type: "Supplier" });
+        const ledgerEntryId = (await addLedgerEntry({ accountId, date, description, debit: 0, credit: totalCost })) as number;
+        const acct = await db.ledgerAccounts.get(accountId);
+        const entryRow = await db.ledgerEntries.get(ledgerEntryId);
+        if (acct?.uid && entryRow?.uid) {
+          await db.outbox.add(
+            makeSyncEvent({
+              entityType: "ledger.entry",
+              entityId: entryRow.uid,
+              op: "create",
+              payload: {
+                account: { uid: acct.uid, name: acct.name, type: acct.type },
+                entry: { uid: entryRow.uid, date: entryRow.date, description: entryRow.description, debit: entryRow.debit, credit: entryRow.credit },
+              },
+            })
+          );
+        }
       }
     });
 
@@ -149,10 +162,16 @@ export default function PurchasesPage() {
     setPurchaseForm({
       supplierName: "",
       date: new Date().toISOString().slice(0, 10),
+      paymentType: "Due",
+      method: "Cash",
+      financialAccountId: 0,
       lineItemDraft: { itemId: 0, quantity: 1 },
       lineItems: [],
     });
   };
+
+  const inventoryList = inventory ?? [];
+  const purchaseList = purchases ?? [];
 
   return (
     <div className="space-y-6">
@@ -190,7 +209,51 @@ export default function PurchasesPage() {
                 className="w-full px-3 py-2 border rounded-md"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Paid / Due</label>
+              <select
+                value={purchaseForm.paymentType}
+                onChange={(e) => setPurchaseForm({ ...purchaseForm, paymentType: e.target.value as "Paid" | "Due" })}
+                className="w-full px-3 py-2 border rounded-md bg-white"
+              >
+                <option value="Due">Due (Creates Supplier Payable)</option>
+                <option value="Paid">Paid Now (Affects Account)</option>
+              </select>
+            </div>
           </div>
+
+          {purchaseForm.paymentType === "Paid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Payment Method</label>
+                <select
+                  value={purchaseForm.method}
+                  onChange={(e) => setPurchaseForm({ ...purchaseForm, method: e.target.value as PaymentMethod })}
+                  className="w-full px-3 py-2 border rounded-md bg-white"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="QR">QR</option>
+                  <option value="BankTransfer">Bank Transfer</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-1">Account</label>
+                <select
+                  value={purchaseForm.financialAccountId}
+                  onChange={(e) => setPurchaseForm({ ...purchaseForm, financialAccountId: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border rounded-md bg-white"
+                >
+                  <option value={0}>Select account…</option>
+                  {sortAccountsForPicker(financialAccounts).map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.type} — {a.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-1 text-xs text-slate-500">If you don’t select, it will use Cash in Hand.</div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
             <div>
@@ -206,7 +269,7 @@ export default function PurchasesPage() {
                 className="w-full px-3 py-2 border rounded-md bg-white"
               >
                 <option value={0}>Select...</option>
-                {inventory.map((i) => (
+                {inventoryList.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.name} (Current: {i.quantity} {i.unit})
                   </option>
@@ -251,7 +314,7 @@ export default function PurchasesPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
                   {purchaseForm.lineItems.map((li) => {
-                    const item = inventory.find((i) => i.id === li.itemId);
+                    const item = inventoryList.find((i) => i.id === li.itemId);
                     const lineCost = (item?.costPrice ?? 0) * li.quantity;
                     return (
                       <tr key={li.itemId}>
@@ -281,7 +344,7 @@ export default function PurchasesPage() {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        {purchases.length === 0 ? (
+        {purchaseList.length === 0 ? (
           <div className="p-8 text-center text-slate-500">
             <p className="text-lg font-medium text-slate-900">No purchases recorded</p>
           </div>
@@ -297,11 +360,11 @@ export default function PurchasesPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
-              {purchases
+              {purchaseList
                 .slice()
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                 .map((purchase) => {
-                  const item = inventory.find((i) => i.id === purchase.itemId);
+                  const item = inventoryList.find((i) => i.id === purchase.itemId);
                   return (
                     <tr key={purchase.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
