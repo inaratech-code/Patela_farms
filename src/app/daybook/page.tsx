@@ -14,9 +14,18 @@ function formatSheetDate(isoDate: string) {
   return `${y} / ${m} / ${d}`;
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function localDayKeyFromIsoTime(isoTime: string) {
+  const d = new Date(isoTime);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 function isBeforeDay(isoTime: string, isoDate: string) {
-  // isoTime is full ISO; compare by yyyy-mm-dd prefix
-  const day = isoTime.slice(0, 10);
+  // Compare by local day key (prevents UTC vs local-day mismatches).
+  const day = localDayKeyFromIsoTime(isoTime);
   return day < isoDate;
 }
 
@@ -26,7 +35,7 @@ export default function DayBookPage() {
 
   const dayEntries = useMemo(() => {
     const list = allEntries
-      .filter((e) => e.time.startsWith(selectedDate))
+      .filter((e) => localDayKeyFromIsoTime(e.time) === selectedDate)
       .slice()
       .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
     return {
