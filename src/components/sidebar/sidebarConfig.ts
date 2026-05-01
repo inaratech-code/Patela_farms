@@ -9,6 +9,7 @@ import {
   Receipt,
   BookOpenText,
   Clock,
+  Landmark,
   Users,
   Bell,
   Settings,
@@ -60,6 +61,7 @@ export const sidebarGroups: SidebarGroupConfig[] = [
       { id: "ledger", label: "Ledger", href: "/ledger", icon: BookOpenText },
       { id: "dayBook", label: "Day Book", href: "/daybook", icon: Clock },
       { id: "payments", label: "Payments", href: "/payments", icon: HandCoins },
+      { id: "financialAccounts", label: "Financial Accounts", href: "/accounts", icon: Landmark },
     ],
   },
   {
