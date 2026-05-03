@@ -100,7 +100,7 @@ export default function InventoryPage() {
   };
 
   const actionClass =
-    "inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50";
+    "inline-flex items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
 
   return (
     <div className="space-y-6">
@@ -240,89 +240,125 @@ export default function InventoryPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Item</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Stock</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Avg cost</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Sell</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Expiry</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {items.map((item) => {
-                const t = resolveItemType(item);
-                const tb = typeBadge(t);
-                const th = item.reorderLevel ?? item.minStockThreshold ?? 0;
-                const status = getStockStatus(item.quantity, th);
-                const unitCost = Number(item.avgCost ?? item.costPrice ?? 0);
-                return (
-                  <tr key={item.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-900">{item.name}</div>
-                      {item.sku ? <div className="text-xs text-slate-500 mt-0.5">SKU: {item.sku}</div> : null}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tb.classes}`}>{tb.label}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-slate-900 mb-1">{item.quantity} {item.unit}</div>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${status.classes}`}>
-                        {status.label}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {items.map((item) => {
+            const t = resolveItemType(item);
+            const tb = typeBadge(t);
+            const th = item.reorderLevel ?? item.minStockThreshold ?? 0;
+            const status = getStockStatus(item.quantity, th);
+            const unitCost = Number(item.avgCost ?? item.costPrice ?? 0);
+            const listCost = Number(item.costPrice ?? 0);
+            const showBothCosts = Math.abs(unitCost - listCost) >= 0.01;
+            const lineValue = Number(item.quantity ?? 0) * unitCost;
+            return (
+              <article
+                key={item.id}
+                className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:border-primary/25 hover:shadow-md transition-shadow"
+              >
+                <header className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold text-slate-900 leading-tight">{item.name}</h2>
+                    {item.sku ? (
+                      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                        SKU <span className="font-mono normal-case text-slate-700">{item.sku}</span>
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-slate-400">No SKU</p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tb.classes}`}>{tb.label}</span>
+                    {item.active === false ? (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-600">Inactive</span>
+                    ) : null}
+                  </div>
+                </header>
+
+                <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 text-sm">
+                  <div className="col-span-2">
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Stock on hand</dt>
+                    <dd className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <span className="text-lg font-bold tabular-nums text-slate-900">
+                        {item.quantity} {item.unit}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      Rs. {unitCost.toLocaleString()}
-                      <span className="block text-xs text-slate-400 mt-0.5">per {item.unit}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">Rs. {Number(item.sellingPrice ?? 0).toLocaleString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      {item.expiryDate || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium">
-                      <div className="flex flex-wrap justify-end gap-1.5">
-                        {isSellable(item) && item.id ? (
-                          <Link href={`/orders?tab=Sales&itemId=${item.id}`} className={actionClass}>
-                            <ShoppingCart className="w-3.5 h-3.5 mr-1" aria-hidden />
-                            Sell
-                          </Link>
-                        ) : null}
-                        {isConsumable(item) && item.id ? (
-                          <Link href={`/consumption?itemId=${item.id}`} className={actionClass}>
-                            <Soup className="w-3.5 h-3.5 mr-1" aria-hidden />
-                            Use stock
-                          </Link>
-                        ) : null}
-                        {item.id ? (
-                          <Link href={`/stock-movement?itemId=${item.id}`} className={actionClass}>
-                            Adjust
-                          </Link>
-                        ) : null}
-                        {isSellable(item) && item.id ? (
-                          <Link href={`/loss-wastage?itemId=${item.id}`} className={actionClass}>
-                            <AlertTriangle className="w-3.5 h-3.5 mr-1" aria-hidden />
-                            Loss
-                          </Link>
-                        ) : null}
-                        {isConsumable(item) && item.id ? (
-                          <Link href={`/loss-wastage?itemId=${item.id}`} className={actionClass}>
-                            Damage
-                          </Link>
-                        ) : null}
-                        <button type="button" title="Delete item" onClick={() => db.inventory.delete(item.id!)} className="inline-flex items-center justify-center rounded-md p-2 text-alert-red hover:bg-red-50">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${status.classes}`}>{status.label}</span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Avg cost</dt>
+                    <dd className="mt-0.5 font-semibold tabular-nums text-slate-900">Rs. {unitCost.toLocaleString()}</dd>
+                    <dd className="text-xs text-slate-400">per {item.unit}</dd>
+                  </div>
+                  {showBothCosts ? (
+                    <div>
+                      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">List cost</dt>
+                      <dd className="mt-0.5 font-medium tabular-nums text-slate-700">Rs. {listCost.toLocaleString()}</dd>
+                      <dd className="text-xs text-slate-400">per {item.unit}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Selling price</dt>
+                    <dd className="mt-0.5 font-semibold tabular-nums text-slate-900">Rs. {Number(item.sellingPrice ?? 0).toLocaleString()}</dd>
+                    <dd className="text-xs text-slate-400">per {item.unit}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reorder at</dt>
+                    <dd className="mt-0.5 font-medium tabular-nums text-slate-900">{th || "—"}</dd>
+                    <dd className="text-xs text-slate-400">{item.unit}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Stock value (qty × avg)</dt>
+                    <dd className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">Rs. {lineValue.toLocaleString()}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Expiry</dt>
+                    <dd className="mt-0.5 text-slate-800">{item.expiryDate ? item.expiryDate : "—"}</dd>
+                  </div>
+                </dl>
+
+                <footer className="mt-auto border-t border-slate-100 pt-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {isSellable(item) && item.id ? (
+                      <Link href={`/orders?tab=Sales&itemId=${item.id}`} className={actionClass}>
+                        <ShoppingCart className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                        Sell
+                      </Link>
+                    ) : null}
+                    {isConsumable(item) && item.id ? (
+                      <Link href={`/consumption?itemId=${item.id}`} className={actionClass}>
+                        <Soup className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                        Use stock
+                      </Link>
+                    ) : null}
+                    {item.id ? (
+                      <Link href={`/stock-movement?itemId=${item.id}`} className={actionClass}>
+                        Adjust
+                      </Link>
+                    ) : null}
+                    {isSellable(item) && item.id ? (
+                      <Link href={`/loss-wastage?itemId=${item.id}`} className={actionClass}>
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                        Loss
+                      </Link>
+                    ) : null}
+                    {isConsumable(item) && item.id ? (
+                      <Link href={`/loss-wastage?itemId=${item.id}`} className={actionClass}>
+                        Damage
+                      </Link>
+                    ) : null}
+                    <button
+                      type="button"
+                      title="Delete item"
+                      onClick={() => db.inventory.delete(item.id!)}
+                      className="ml-auto inline-flex items-center justify-center rounded-md border border-transparent p-2 text-alert-red hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </footer>
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

@@ -42,10 +42,14 @@ alter table public.farm_members enable row level security;
 alter table public.events enable row level security;
 
 -- Farms: owners/members can read; creator can insert
+-- Members see their farm; creator can read a farm they created before the first farm_members row exists.
 drop policy if exists farms_select on public.farms;
 create policy farms_select on public.farms
 for select to authenticated
-using (public.is_farm_member(id));
+using (
+  public.is_farm_member(id)
+  or created_by = auth.uid()
+);
 
 drop policy if exists farms_insert on public.farms;
 create policy farms_insert on public.farms
@@ -58,10 +62,20 @@ create policy farm_members_select on public.farm_members
 for select to authenticated
 using (public.is_farm_member(farm_id));
 
+-- Creator must be able to insert the first row before is_farm_member() is true.
 drop policy if exists farm_members_insert on public.farm_members;
 create policy farm_members_insert on public.farm_members
 for insert to authenticated
-with check (public.is_farm_member(farm_id));
+with check (
+  user_id = auth.uid()
+  and (
+    public.is_farm_member(farm_id)
+    or exists (
+      select 1 from public.farms f
+      where f.id = farm_id and f.created_by = auth.uid()
+    )
+  )
+);
 
 -- Events: only members can read/write within their farm
 drop policy if exists events_select_farm on public.events;

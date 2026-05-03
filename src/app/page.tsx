@@ -5,13 +5,12 @@ import { db } from "@/lib/db";
 import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { HeroSection, StatsCards, SalesChart, QuickActions, RecentActivity, InventorySnapshot, FinanceSnapshot } from "@/components/dashboard";
-import { HandCoins, IndianRupee, Package, TrendingUp } from "lucide-react";
+import { HandCoins, IndianRupee, TrendingUp } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import {
   consumptionTrend7d,
   expenseTrend7d,
   feedExpenseToday,
-  inventoryStockValue,
   lossTrend7d,
   netProfitErp,
 } from "@/lib/erp/metrics";
@@ -47,8 +46,6 @@ export default function Dashboard() {
 
   const todayKey = new Date().toISOString().split("T")[0];
   const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-
-  const stockValueErp = useMemo(() => inventoryStockValue(inventory ?? []), [inventory]);
 
   const purchasesThisMonth = (purchases ?? [])
     .filter((p) => new Date(p.date).toISOString().slice(0, 7) === monthKey)
@@ -193,15 +190,6 @@ export default function Dashboard() {
   const statCards = useMemo(() => {
     return [
       {
-        id: "stockValue",
-        title: "Total Stock Value",
-        value: `Rs. ${stockValueErp.toLocaleString()}`,
-        deltaPct: 0,
-        icon: Package,
-        iconBg: "bg-[#0871b3]/10",
-        iconFg: "text-[#0871b3]",
-      },
-      {
         id: "todaySales",
         title: "Today Sales",
         value: `Rs. ${todaySales.toLocaleString()}`,
@@ -250,7 +238,6 @@ export default function Dashboard() {
       },
     ];
   }, [
-    stockValueErp,
     todaySales,
     feedToday,
     finance.receivable,

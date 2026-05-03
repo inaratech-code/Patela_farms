@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabaseClient";
+import { ensureSupabaseAuth, getSupabaseClient } from "@/lib/supabaseClient";
 
 export const FARM_ID_KEY = "pf.farmId.v1";
 
@@ -19,11 +19,15 @@ export async function ensureFarm() {
   const existing = getFarmId();
   if (existing) return existing;
 
-  // Create a farm and add current user as member/owner.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  await ensureSupabaseAuth();
 
+  // Ensure JWT is attached before RLS runs on insert (avoids created_by ≠ auth.uid() races).
+  const {
+    data: { session },
+    error: sessionErr,
+  } = await supabase.auth.getSession();
+  if (sessionErr) throw sessionErr;
+  const user = session?.user;
   if (!user?.id) throw new Error("Supabase auth user missing. Sign in (anonymous) first.");
 
   const { data: farm, error: farmErr } = await supabase
