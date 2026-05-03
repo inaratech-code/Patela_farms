@@ -7,7 +7,6 @@ export interface InventoryItem {
   id?: number;
   uid?: string; // stable id for sync
   name: string;
-  sku?: string;
   /** Fish/Chicken = sellable; Feed = consumable; optional equipment. */
   itemType?: ItemTypeErp;
   /** When false, hidden from default pickers (soft delete). */
@@ -20,7 +19,6 @@ export interface InventoryItem {
   unit: string;
   costPrice: number;
   sellingPrice: number;
-  expiryDate?: string;
   minStockThreshold: number;
 }
 
@@ -436,7 +434,6 @@ export class PatelaFarmDatabase extends Dexie {
         await inv.toCollection().modify((row: Record<string, unknown>) => {
           if (!row.itemType) row.itemType = "sellable";
           if (row.active === undefined) row.active = true;
-          if (row.sku === undefined) row.sku = "";
           const minT = Number(row.minStockThreshold ?? 0);
           if (typeof row.reorderLevel !== "number") row.reorderLevel = minT;
           const cp = Number(row.costPrice ?? 0);
@@ -465,6 +462,52 @@ export class PatelaFarmDatabase extends Dexie {
             row.dueAmount = 0;
             row.paymentStatus = "paid";
           }
+        });
+      });
+
+    this.version(11)
+      .stores({
+        inventory: '++id, uid, name, quantity, itemType, active',
+        inventoryLosses: '++id, uid, itemId, lossType, date',
+        stockMovement: '++id, uid, itemId, type, reason, date',
+        sales: '++id, uid, itemId, paymentType, date, paymentStatus',
+        purchases: '++id, uid, supplierName, itemId, date, paymentStatus',
+        dayBook: '++id, uid, time, type, category, accountId',
+        ledgerAccounts: '++id, uid, name, type',
+        ledgerEntries: '++id, uid, accountId, date',
+        payments: '++id, uid, partyAccountId, direction, date, accountId',
+        financialAccounts: '++id, uid, name, type',
+        roles: '++id, name',
+        users: '++id, username, roleId',
+        outbox: 'id, createdAt, pushedAt, entityType, entityId',
+        consumptionLogs: '++id, uid, itemId, category, date',
+      })
+      .upgrade(async (tx) => {
+        await tx.table("inventory").toCollection().modify((row: Record<string, unknown>) => {
+          delete row.sku;
+        });
+      });
+
+    this.version(12)
+      .stores({
+        inventory: '++id, uid, name, quantity, itemType, active',
+        inventoryLosses: '++id, uid, itemId, lossType, date',
+        stockMovement: '++id, uid, itemId, type, reason, date',
+        sales: '++id, uid, itemId, paymentType, date, paymentStatus',
+        purchases: '++id, uid, supplierName, itemId, date, paymentStatus',
+        dayBook: '++id, uid, time, type, category, accountId',
+        ledgerAccounts: '++id, uid, name, type',
+        ledgerEntries: '++id, uid, accountId, date',
+        payments: '++id, uid, partyAccountId, direction, date, accountId',
+        financialAccounts: '++id, uid, name, type',
+        roles: '++id, name',
+        users: '++id, username, roleId',
+        outbox: 'id, createdAt, pushedAt, entityType, entityId',
+        consumptionLogs: '++id, uid, itemId, category, date',
+      })
+      .upgrade(async (tx) => {
+        await tx.table("inventory").toCollection().modify((row: Record<string, unknown>) => {
+          delete row.expiryDate;
         });
       });
 

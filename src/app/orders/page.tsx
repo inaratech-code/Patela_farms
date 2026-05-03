@@ -14,6 +14,7 @@ import {
 import { getOrCreateDefaultCashAccountId, sortAccountsForPicker, type PaymentMethod } from "@/lib/accounts";
 import { makeSyncEvent } from "@/lib/syncEvents";
 import { newUid } from "@/lib/uid";
+import { buildSupplierNameOptions } from "@/lib/supplierOptions";
 
 /** Digits + one dot; strips meaningless leading zeros on the whole part (keeps 0.5). */
 function normalizeSaleQtyInput(raw: string): string {
@@ -58,6 +59,7 @@ export default function OrdersPage() {
   const purchases = useLiveQuery(() => db.purchases.toArray()) || [];
   const financialAccounts = useLiveQuery(() => db.financialAccounts.toArray()) || [];
   const ledgerCustomers = useLiveQuery(() => db.ledgerAccounts.where("type").equals("Customer").toArray()) || [];
+  const ledgerSuppliers = useLiveQuery(() => db.ledgerAccounts.where("type").equals("Supplier").toArray()) || [];
 
   const customerOptions = useMemo(() => {
     const names = new Set<string>();
@@ -74,6 +76,11 @@ export default function OrdersPage() {
       .sort((a, b) => a.localeCompare(b));
     return [WALK_IN_CUSTOMER_NAME, ...rest];
   }, [ledgerCustomers, sales]);
+
+  const supplierOptions = useMemo(
+    () => buildSupplierNameOptions(ledgerSuppliers, purchases),
+    [ledgerSuppliers, purchases]
+  );
   
   const [activeTab, setActiveTab] = useState<"Sales" | "Purchases">("Sales");
   const [showForm, setShowForm] = useState(false);
@@ -591,14 +598,22 @@ export default function OrdersPage() {
         <form onSubmit={handlePurchaseSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Supplier Name</label>
+              <label className="block text-sm font-medium mb-1">Supplier</label>
               <input
                 required
                 type="text"
+                list="orders-purchase-supplier-names"
+                autoComplete="off"
                 value={purchaseForm.supplierName}
                 onChange={(e) => setPurchaseForm({ ...purchaseForm, supplierName: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-3 py-2 border rounded-md bg-white"
+                placeholder="Pick from list or type a new supplier"
               />
+              <datalist id="orders-purchase-supplier-names">
+                {supplierOptions.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Date</label>

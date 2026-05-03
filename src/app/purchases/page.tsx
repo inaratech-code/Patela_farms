@@ -9,6 +9,7 @@ import { getOrCreateDefaultCashAccountId, sortAccountsForPicker, type PaymentMet
 import { makeSyncEvent } from "@/lib/syncEvents";
 import { newUid } from "@/lib/uid";
 import { useSearchParams } from "next/navigation";
+import { buildSupplierNameOptions } from "@/lib/supplierOptions";
 
 /** Same decimal rules as Sales (orders page). */
 function normalizeQtyInput(raw: string): string {
@@ -51,6 +52,7 @@ type PurchaseLine = { itemId: number; quantity: number; unitCost: number };
 export default function PurchasesPage() {
   const inventory = useLiveQuery(() => db.inventory.toArray());
   const purchases = useLiveQuery(() => db.purchases.toArray());
+  const ledgerSuppliers = useLiveQuery(() => db.ledgerAccounts.where("type").equals("Supplier").toArray()) || [];
   const financialAccounts = useLiveQuery(() => db.financialAccounts.toArray()) || [];
   const searchParams = useSearchParams();
 
@@ -253,6 +255,11 @@ export default function PurchasesPage() {
   const inventoryList = inventory ?? [];
   const purchaseList = purchases ?? [];
 
+  const supplierOptions = useMemo(
+    () => buildSupplierNameOptions(ledgerSuppliers, purchaseList),
+    [ledgerSuppliers, purchaseList]
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -272,14 +279,22 @@ export default function PurchasesPage() {
           className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
         >
           <div className="lg:col-span-2">
-            <label className="block text-sm font-medium mb-1">Supplier Name</label>
+            <label className="block text-sm font-medium mb-1">Supplier</label>
             <input
               required
               type="text"
+              list="purchases-supplier-names"
+              autoComplete="off"
               value={purchaseForm.supplierName}
               onChange={(e) => setPurchaseForm({ ...purchaseForm, supplierName: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border rounded-md bg-white"
+              placeholder="Pick from list or type a new supplier"
             />
+            <datalist id="purchases-supplier-names">
+              {supplierOptions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Date</label>

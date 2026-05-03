@@ -36,7 +36,7 @@ function safeJsonParse<T>(value: string | null, fallback: T): T {
 }
 
 function computeAlertBadge(params: {
-  inventory: Array<{ quantity: number; minStockThreshold: number; reorderLevel?: number; expiryDate?: string }>;
+  inventory: Array<{ quantity: number; minStockThreshold: number; reorderLevel?: number }>;
   ledgerAccounts: Array<{ id?: number }>;
   ledgerEntries: Array<{ accountId: number; debit: number; credit: number }>;
 }) {
@@ -44,18 +44,6 @@ function computeAlertBadge(params: {
     const th = i.reorderLevel ?? i.minStockThreshold ?? 0;
     return i.quantity <= th;
   }).length;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiryWindowDays = 7;
-  const expiry = params.inventory
-    .filter((i) => !!i.expiryDate)
-    .map((i) => {
-      const exp = new Date(`${i.expiryDate}T00:00:00`);
-      const daysLeft = Math.floor((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      return daysLeft;
-    })
-    .filter((d) => d <= expiryWindowDays).length;
 
   const sums = new Map<number, { debit: number; credit: number }>();
   for (const e of params.ledgerEntries) {
@@ -70,7 +58,7 @@ function computeAlertBadge(params: {
     return s.debit - s.credit !== 0;
   }).length;
 
-  return lowStock + expiry + pending;
+  return lowStock + pending;
 }
 
 export function SidebarProvider(props: { children: React.ReactNode }) {

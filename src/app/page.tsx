@@ -135,7 +135,7 @@ export default function Dashboard() {
     const tx = (dayBook ?? [])
       .slice()
       .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-      .slice(0, 6)
+      .slice(0, 25)
       .map((e) => {
         const isIncome = e.type === "Income";
         return {
@@ -157,7 +157,7 @@ export default function Dashboard() {
       icon: "alert" as const,
     }));
 
-    return [...alerts, ...tx].slice(0, 8);
+    return [...alerts, ...tx].slice(0, 30);
   }, [dayBook, lowStockItemsTop5]);
 
   const finance = useMemo(() => {

@@ -17,14 +17,12 @@ export default function InventoryPage() {
   // New Item Form
   const [formData, setFormData] = useState({
     name: "",
-    sku: "",
     itemType: "sellable" as ItemTypeErp,
     quantity: "",
     unit: "kg",
     costPrice: "",
     sellingPrice: "",
     minStockThreshold: "",
-    expiryDate: "",
   });
   const [unitMode, setUnitMode] = useState<"preset" | "custom">("preset");
   const [customUnit, setCustomUnit] = useState("");
@@ -47,7 +45,6 @@ export default function InventoryPage() {
     const item = {
       uid: newUid(),
       name: formData.name,
-      sku: formData.sku.trim() || undefined,
       itemType: formData.itemType,
       active: true as const,
       unit: unitMode === "custom" ? (customUnit.trim() || formData.unit) : formData.unit,
@@ -57,7 +54,6 @@ export default function InventoryPage() {
       minStockThreshold: reorder,
       reorderLevel: reorder,
       avgCost: cost,
-      expiryDate: formData.expiryDate || undefined,
     };
 
     await db.transaction("rw", db.tables, async () => {
@@ -74,14 +70,12 @@ export default function InventoryPage() {
     setShowForm(false);
     setFormData({
       name: "",
-      sku: "",
       itemType: "sellable",
       quantity: "",
       unit: "kg",
       costPrice: "",
       sellingPrice: "",
       minStockThreshold: "",
-      expiryDate: "",
     });
     setUnitMode("preset");
     setCustomUnit("");
@@ -116,14 +110,10 @@ export default function InventoryPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Item Name</label>
             <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">SKU (optional)</label>
-            <input type="text" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} className="w-full px-3 py-2 border rounded-md" placeholder="e.g. FISH-001" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Item type</label>
@@ -210,10 +200,6 @@ export default function InventoryPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Expiry Date (Optional)</label>
-            <input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
-          </div>
-          <div>
             <label className="block text-sm font-medium mb-1">Reorder / low stock at</label>
             <input
               required
@@ -225,7 +211,7 @@ export default function InventoryPage() {
               placeholder="e.g. 10"
             />
           </div>
-          <div className="sm:col-span-2 lg:col-span-4 flex justify-end mt-2">
+          <div className="sm:col-span-2 lg:col-span-3 flex justify-end mt-2">
             <button type="submit" className="px-6 py-2 bg-secondary text-white rounded-md hover:bg-secondary/90">Save Item</button>
           </div>
         </form>
@@ -258,13 +244,6 @@ export default function InventoryPage() {
                 <header className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3">
                   <div className="min-w-0">
                     <h2 className="text-base font-semibold text-slate-900 leading-tight">{item.name}</h2>
-                    {item.sku ? (
-                      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
-                        SKU <span className="font-mono normal-case text-slate-700">{item.sku}</span>
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-xs text-slate-400">No SKU</p>
-                    )}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tb.classes}`}>{tb.label}</span>
@@ -309,10 +288,6 @@ export default function InventoryPage() {
                   <div className="col-span-2">
                     <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Stock value (qty × avg)</dt>
                     <dd className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">Rs. {lineValue.toLocaleString()}</dd>
-                  </div>
-                  <div className="col-span-2">
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Expiry</dt>
-                    <dd className="mt-0.5 text-slate-800">{item.expiryDate ? item.expiryDate : "—"}</dd>
                   </div>
                 </dl>
 

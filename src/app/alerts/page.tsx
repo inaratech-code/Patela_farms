@@ -3,13 +3,8 @@
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useMemo } from "react";
-import { AlertCircle, CalendarClock, Wallet, ArrowRight } from "lucide-react";
+import { AlertCircle, Wallet, ArrowRight } from "lucide-react";
 import { db } from "@/lib/db";
-
-function daysBetween(a: Date, b: Date) {
-  const ms = b.getTime() - a.getTime();
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
-}
 
 export default function AlertsPage() {
   const inventory = useLiveQuery(() => db.inventory.toArray()) || [];
@@ -19,30 +14,15 @@ export default function AlertsPage() {
   const lowStock = useMemo(
     () =>
       inventory
-        .filter((i) => i.quantity <= i.minStockThreshold)
+        .filter((i) => {
+          const th = i.reorderLevel ?? i.minStockThreshold ?? 0;
+          return th > 0 && i.quantity <= th;
+        })
         .sort((a, b) => a.quantity - b.quantity),
     [inventory]
   );
 
-  const expiryWindowDays = 7;
-  const expiry = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return inventory
-      .filter((i) => !!i.expiryDate)
-      .map((i) => {
-        const exp = new Date(`${i.expiryDate}T00:00:00`);
-        const d = daysBetween(today, exp);
-        return { item: i, exp, daysLeft: d };
-      })
-      .filter((x) => x.daysLeft <= expiryWindowDays)
-      .sort((a, b) => a.daysLeft - b.daysLeft);
-  }, [inventory]);
-
   const pendingPayments = useMemo(() => {
-    // Debit = money you will receive (Customer dues)
-    // Credit = money you owe (Supplier dues)
-    // balance = sum(debit - credit)
     const byAccount = new Map<number, { debit: number; credit: number }>();
     for (const e of entries) {
       const cur = byAccount.get(e.accountId) ?? { debit: 0, credit: 0 };
@@ -69,7 +49,7 @@ export default function AlertsPage() {
         <h1 className="text-2xl font-semibold text-slate-900">Alerts & Notifications</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-xl bg-white shadow-sm border border-slate-100 overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex items-center justify-between">
             <div>
@@ -82,51 +62,22 @@ export default function AlertsPage() {
             <div className="p-6 text-sm text-slate-500">No low stock items.</div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {lowStock.slice(0, 8).map((i) => (
-                <div key={i.id} className="p-6 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-slate-900">{i.name}</div>
-                    <div className="text-sm text-slate-500">
-                      {i.quantity} {i.unit} (alert at {i.minStockThreshold})
+              {lowStock.slice(0, 8).map((i) => {
+                const th = i.reorderLevel ?? i.minStockThreshold ?? 0;
+                return (
+                  <div key={i.id} className="p-6 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-slate-900">{i.name}</div>
+                      <div className="text-sm text-slate-500">
+                        {i.quantity} {i.unit} (reorder at {th})
+                      </div>
                     </div>
+                    <Link href="/inventory" className="text-primary text-sm font-medium inline-flex items-center gap-1">
+                      Open <ArrowRight className="w-4 h-4" />
+                    </Link>
                   </div>
-                  <Link href="/inventory" className="text-primary text-sm font-medium inline-flex items-center gap-1">
-                    Open <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-xl bg-white shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium text-slate-500">Expiry alert (≤ {expiryWindowDays} days)</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900">{expiry.length} item(s)</div>
-            </div>
-            <CalendarClock className="w-6 h-6 text-alert-red" />
-          </div>
-          {expiry.length === 0 ? (
-            <div className="p-6 text-sm text-slate-500">No expiring items in the next {expiryWindowDays} days.</div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {expiry.slice(0, 8).map((x) => (
-                <div key={x.item.id} className="p-6 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-slate-900">{x.item.name}</div>
-                    <div className="text-sm text-slate-500">
-                      Exp: {x.item.expiryDate} ·{" "}
-                      <span className={x.daysLeft < 0 ? "text-alert-red font-semibold" : "text-slate-600"}>
-                        {x.daysLeft < 0 ? `${Math.abs(x.daysLeft)} day(s) expired` : `${x.daysLeft} day(s) left`}
-                      </span>
-                    </div>
-                  </div>
-                  <Link href="/inventory" className="text-primary text-sm font-medium inline-flex items-center gap-1">
-                    Open <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -172,4 +123,3 @@ export default function AlertsPage() {
     </div>
   );
 }
-
