@@ -1,12 +1,13 @@
 "use client";
 
 import { BookOpenText, Plus, Search, Trash2, ArrowRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { makeSyncEvent } from "@/lib/syncEvents";
 import { newUid } from "@/lib/uid";
+import { getOrCreateWalkInCustomerAccountId } from "@/lib/ledger";
 
 function asDrCr(amount: number) {
   if (amount === 0) return { label: "0", side: "" as const };
@@ -38,6 +39,12 @@ export default function LedgerPage() {
     }
     return m;
   }, [entries]);
+
+  useEffect(() => {
+    void db.transaction("rw", db.tables, async () => {
+      await getOrCreateWalkInCustomerAccountId();
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
