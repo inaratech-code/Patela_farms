@@ -68,6 +68,7 @@ export default function OrdersPage() {
   const [showForm, setShowForm] = useState(false);
   
   const [saleQuantityStr, setSaleQuantityStr] = useState("1");
+  const [saleUnitPriceStr, setSaleUnitPriceStr] = useState("");
   const [saleForm, setSaleForm] = useState<{
     itemId: number;
     customerName: string;
@@ -88,9 +89,10 @@ export default function OrdersPage() {
   const saleTotal = useMemo(() => {
     const item = inventory.find((i) => i.id === Number(saleForm.itemId));
     const qty = parseSaleQuantityInput(saleQuantityStr);
-    if (!item || qty == null || qty <= 0) return 0;
-    return item.sellingPrice * qty;
-  }, [inventory, saleForm.itemId, saleQuantityStr]);
+    const unit = parseSaleQuantityInput(saleUnitPriceStr.trim());
+    if (!item || qty == null || qty <= 0 || unit == null || unit <= 0) return 0;
+    return unit * qty;
+  }, [inventory, saleForm.itemId, saleQuantityStr, saleUnitPriceStr]);
 
   const purchaseTotal = useMemo(() => {
     return purchaseForm.lineItems.reduce((acc, li) => {
@@ -138,8 +140,12 @@ export default function OrdersPage() {
     }
     const item = inventory.find(i => i.id === Number(saleForm.itemId));
     if (!item || item.quantity < qtyParsed) return alert("Not enough stock!");
-    
-    const totalPrice = item.sellingPrice * qtyParsed;
+
+    const unitPrice = parseSaleQuantityInput(saleUnitPriceStr.trim());
+    if (unitPrice == null || unitPrice <= 0) {
+      return alert("Enter a valid selling price per unit (greater than 0).");
+    }
+    const totalPrice = unitPrice * qtyParsed;
     const date = new Date().toISOString();
 
     const isCredit = saleForm.paymentType === "Credit";
@@ -154,6 +160,7 @@ export default function OrdersPage() {
         itemId: item.id!,
         quantity: qtyParsed,
         totalPrice,
+        unitPrice,
         customerName: saleForm.customerName,
         paymentType: saleForm.paymentType,
         date,
@@ -179,7 +186,7 @@ export default function OrdersPage() {
           type: "Income",
           category: "Sale",
           amount: totalPrice,
-          description: `Sold ${qtyParsed} ${item.unit} ${item.name} (${saleForm.method})`,
+          description: `Sold ${qtyParsed} ${item.unit} ${item.name} @ Rs.${unitPrice}/${item.unit} (${saleForm.method})`,
           method: saleForm.method,
           accountId,
         };
@@ -214,7 +221,7 @@ export default function OrdersPage() {
         ledgerEntryId = (await addLedgerEntry({
           accountId: ledgerAccountId,
           date,
-          description: `Credit sale: ${qtyParsed} ${item.unit} ${item.name}`,
+          description: `Credit sale: ${qtyParsed} ${item.unit} ${item.name} @ Rs.${unitPrice}/${item.unit}`,
           debit: totalPrice,
           credit: 0,
         })) as number;
@@ -260,6 +267,7 @@ export default function OrdersPage() {
 
     setShowForm(false);
     setSaleQuantityStr("1");
+    setSaleUnitPriceStr("");
     setSaleForm({ itemId: 0, customerName: "", paymentType: "Cash", method: "Cash", financialAccountId: 0 });
   };
 
@@ -433,10 +441,19 @@ export default function OrdersPage() {
       </div>
 
       {showForm && activeTab === 'Sales' && (
-        <form onSubmit={handleSaleSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <form onSubmit={handleSaleSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Select Item</label>
-            <select required value={saleForm.itemId} onChange={e => setSaleForm({...saleForm, itemId: Number(e.target.value)})} className="w-full px-3 py-2 border rounded-md bg-white">
+            <select
+              required
+              value={saleForm.itemId}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                setSaleForm({ ...saleForm, itemId: id });
+                setSaleUnitPriceStr("");
+              }}
+              className="w-full px-3 py-2 border rounded-md bg-white"
+            >
               <option value={0}>Select...</option>
               {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.quantity} {i.unit} left)</option>)}
             </select>
@@ -451,6 +468,19 @@ export default function OrdersPage() {
               onChange={(e) => setSaleQuantityStr(normalizeSaleQtyInput(e.target.value))}
               className="w-full px-3 py-2 border rounded-md"
               placeholder="e.g. 29.8"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Selling price (per unit)</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={saleUnitPriceStr}
+              onChange={(e) => setSaleUnitPriceStr(normalizeSaleQtyInput(e.target.value))}
+              className="w-full px-3 py-2 border rounded-md"
+              placeholder="Enter price per unit"
+              title="Retail rate for this sale (cash or credit)"
             />
           </div>
           <div>
@@ -705,7 +735,16 @@ export default function OrdersPage() {
                     <tr key={sale.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{new Date(sale.date).toLocaleDateString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{sale.customerName || "Walk-in"} ({sale.paymentType})</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{sale.quantity}x {item?.name || 'Unknown'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                        {sale.quantity}x {item?.name || "Unknown"}
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          @ Rs.{" "}
+                          {(sale.unitPrice ??
+                            (sale.quantity ? sale.totalPrice / sale.quantity : 0)
+                          ).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                          {item?.unit ? `/${item.unit}` : ""}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-alert-green">+ Rs. {sale.totalPrice}</td>
                     </tr>
                   )

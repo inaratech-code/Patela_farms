@@ -43,6 +43,8 @@ export interface Sale {
   itemId: number;
   quantity: number;
   totalPrice: number;
+  /** Per-unit selling price for this sale (set at POS, not from inventory). */
+  unitPrice?: number;
   customerName?: string;
   paymentType: 'Cash' | 'Credit';
   date: string;

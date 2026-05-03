@@ -18,7 +18,6 @@ export default function InventoryPage() {
     quantity: "",
     unit: "kg",
     costPrice: "",
-    sellingPrice: "",
     minStockThreshold: "",
     expiryDate: "",
   });
@@ -44,7 +43,7 @@ export default function InventoryPage() {
       unit: unitMode === "custom" ? (customUnit.trim() || formData.unit) : formData.unit,
       quantity: Number(formData.quantity || 0),
       costPrice: Number(formData.costPrice || 0),
-      sellingPrice: Number(formData.sellingPrice || 0),
+      sellingPrice: 0,
       minStockThreshold: Number(formData.minStockThreshold || 0),
     };
 
@@ -60,7 +59,7 @@ export default function InventoryPage() {
       );
     });
     setShowForm(false);
-    setFormData({ name: "", quantity: "", unit: "kg", costPrice: "", sellingPrice: "", minStockThreshold: "", expiryDate: "" });
+    setFormData({ name: "", quantity: "", unit: "kg", costPrice: "", minStockThreshold: "", expiryDate: "" });
     setUnitMode("preset");
     setCustomUnit("");
   };
@@ -152,18 +151,6 @@ export default function InventoryPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Selling Price</label>
-            <input
-              required
-              inputMode="numeric"
-              type="text"
-              value={formData.sellingPrice}
-              onChange={(e) => setFormData({ ...formData, sellingPrice: normalizeMoney(e.target.value) })}
-              className="w-full px-3 py-2 border rounded-md"
-              placeholder="e.g. 1000"
-            />
-          </div>
-          <div>
             <label className="block text-sm font-medium mb-1">Expiry Date (Optional)</label>
             <input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
           </div>
@@ -200,7 +187,7 @@ export default function InventoryPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Item</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Pricing</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Cost</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Expiry</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -220,8 +207,8 @@ export default function InventoryPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      <div>CP: Rs. {item.costPrice}</div>
-                      <div>SP: Rs. {item.sellingPrice}</div>
+                      Rs. {item.costPrice}
+                      <span className="block text-xs text-slate-400 mt-0.5">per {item.unit}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                       {item.expiryDate || '-'}
