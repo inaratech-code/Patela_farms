@@ -1,18 +1,74 @@
 "use client";
 
-import { Save, Trash2, RefreshCw, CloudUpload, CloudDownload } from "lucide-react";
-import { db } from "@/lib/db";
-import { clearSession } from "@/lib/auth";
+import {
+  Save,
+  Trash2,
+  RefreshCw,
+  CloudUpload,
+  CloudDownload,
+  Eye,
+  EyeOff,
+  Lock,
+} from "lucide-react";
+import { db, type User } from "@/lib/db";
+import { changePassword, clearSession, getSession } from "@/lib/auth";
 import { getOrCreateDeviceId } from "@/lib/device";
 import { getSyncState } from "@/lib/syncState";
 import { syncNow, pushOutbox, pullEvents } from "@/lib/sync";
 import { useMemo, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 
 export default function SettingsPage() {
+  const session = useMemo(() => getSession(), []);
+  const userId = session?.userId ?? 0;
+  const user = useLiveQuery(async (): Promise<User | undefined> => {
+    if (!userId) return undefined;
+    return (await db.users.get(userId)) ?? undefined;
+  }, [userId]);
+
   const deviceId = useMemo(() => getOrCreateDeviceId(), []);
   const syncState = useMemo(() => getSyncState(), []);
   const [syncStatus, setSyncStatus] = useState<string>("");
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const [passwordForm, setPasswordForm] = useState({
+    current: "",
+    next: "",
+    confirm: "",
+  });
+  const [showPassword, setShowPassword] = useState({
+    current: false,
+    next: false,
+    confirm: false,
+  });
+  const [passwordStatus, setPasswordStatus] = useState<string>("");
+  const [passwordError, setPasswordError] = useState<string>("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  const submitPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId || passwordSaving) return;
+    setPasswordError("");
+    setPasswordStatus("");
+    if (passwordForm.next !== passwordForm.confirm) {
+      setPasswordError("New password and confirmation do not match.");
+      return;
+    }
+    try {
+      setPasswordSaving(true);
+      await changePassword({
+        userId,
+        currentPassword: passwordForm.current,
+        newPassword: passwordForm.next,
+      });
+      setPasswordForm({ current: "", next: "", confirm: "" });
+      setPasswordStatus("Password updated.");
+    } catch (err: unknown) {
+      setPasswordError(err instanceof Error ? err.message : "Could not update password.");
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const runSync = async (mode: "all" | "push" | "pull") => {
     if (isSyncing) return;
@@ -125,6 +181,130 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      {userId && user ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden max-w-2xl">
+          <div className="p-6 border-b border-slate-100">
+            <h2 className="text-lg font-medium text-slate-900">Password</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Signed in as <span className="font-semibold text-slate-800">{user.username}</span>. Use a strong password
+              you do not reuse elsewhere.
+            </p>
+          </div>
+          <form onSubmit={submitPasswordChange} className="p-6 space-y-4">
+            {!user.passwordHash ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                This account has no password on file. Ask an administrator to set one from User Management, or recreate
+                your user with a password.
+              </div>
+            ) : null}
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Current password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  type={showPassword.current ? "text" : "password"}
+                  value={passwordForm.current}
+                  onChange={(e) => setPasswordForm((v) => ({ ...v, current: e.target.value }))}
+                  className="w-full pl-9 pr-11 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  autoComplete="current-password"
+                  disabled={!user.passwordHash}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => ({ ...s, current: !s.current }))}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+                  aria-label={showPassword.current ? "Hide current password" : "Show current password"}
+                  disabled={!user.passwordHash}
+                >
+                  {showPassword.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">New password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  type={showPassword.next ? "text" : "password"}
+                  value={passwordForm.next}
+                  onChange={(e) => setPasswordForm((v) => ({ ...v, next: e.target.value }))}
+                  className="w-full pl-9 pr-11 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  autoComplete="new-password"
+                  minLength={4}
+                  maxLength={20}
+                  disabled={!user.passwordHash}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => ({ ...s, next: !s.next }))}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+                  aria-label={showPassword.next ? "Hide new password" : "Show new password"}
+                  disabled={!user.passwordHash}
+                >
+                  {showPassword.next ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="mt-1 text-xs text-slate-500">4–20 characters (same rules as new users).</div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Confirm new password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  type={showPassword.confirm ? "text" : "password"}
+                  value={passwordForm.confirm}
+                  onChange={(e) => setPasswordForm((v) => ({ ...v, confirm: e.target.value }))}
+                  className="w-full pl-9 pr-11 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  autoComplete="new-password"
+                  minLength={4}
+                  maxLength={20}
+                  disabled={!user.passwordHash}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => ({ ...s, confirm: !s.confirm }))}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+                  aria-label={showPassword.confirm ? "Hide confirmation" : "Show confirmation"}
+                  disabled={!user.passwordHash}
+                >
+                  {showPassword.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {passwordError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                {passwordError}
+              </div>
+            ) : null}
+            {passwordStatus ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                {passwordStatus}
+              </div>
+            ) : null}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={
+                  passwordSaving ||
+                  !user.passwordHash ||
+                  passwordForm.current.length === 0 ||
+                  passwordForm.next.length < 4 ||
+                  passwordForm.next.length > 20
+                }
+                className="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90 disabled:opacity-60"
+              >
+                {passwordSaving ? "Saving…" : "Update password"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden max-w-2xl">
         <div className="p-6 border-b border-slate-100">

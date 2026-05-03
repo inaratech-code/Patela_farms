@@ -511,6 +511,32 @@ export class PatelaFarmDatabase extends Dexie {
         });
       });
 
+    this.version(13)
+      .stores({
+        inventory: '++id, uid, name, quantity, itemType, active',
+        inventoryLosses: '++id, uid, itemId, lossType, date',
+        stockMovement: '++id, uid, itemId, type, reason, date',
+        sales: '++id, uid, itemId, paymentType, date, paymentStatus',
+        purchases: '++id, uid, supplierName, itemId, date, paymentStatus',
+        dayBook: '++id, uid, time, type, category, accountId',
+        ledgerAccounts: '++id, uid, name, type',
+        ledgerEntries: '++id, uid, accountId, date',
+        payments: '++id, uid, partyAccountId, direction, date, accountId',
+        financialAccounts: '++id, uid, name, type',
+        roles: '++id, name',
+        users: '++id, username, roleId',
+        outbox: 'id, createdAt, pushedAt, entityType, entityId',
+        consumptionLogs: '++id, uid, itemId, category, date',
+      })
+      .upgrade(async (tx) => {
+        await tx.table("roles").toCollection().modify((row: Record<string, unknown>) => {
+          const p = row.permissions;
+          if (!Array.isArray(p)) return;
+          const mapped = p.map((x) => (x === "transactions.payments" ? "accounts.payments" : x));
+          row.permissions = [...new Set(mapped as string[])];
+        });
+      });
+
     this.inventory = this.table('inventory');
     this.inventoryLosses = this.table("inventoryLosses");
     this.stockMovement = this.table('stockMovement');

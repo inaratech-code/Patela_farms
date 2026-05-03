@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
-import { demoLogin, loginWithPassword, getSession } from "@/lib/auth";
-import { Lock, User } from "lucide-react";
+import { loginWithPassword, getSession } from "@/lib/auth";
+import { Eye, EyeOff, Lock, User } from "lucide-react";
 import Link from "next/link";
 
 export function LoginClient() {
@@ -13,6 +13,7 @@ export function LoginClient() {
   const users = useLiveQuery(() => db.users.toArray());
 
   const [form, setForm] = useState({ username: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isWorking, setIsWorking] = useState(false);
 
@@ -34,21 +35,6 @@ export function LoginClient() {
       window.location.replace(next);
     } catch (err: any) {
       setError(err?.message ?? "Login failed");
-    } finally {
-      setIsWorking(false);
-    }
-  };
-
-  const onDemo = async () => {
-    if (isWorking) return;
-    setError(null);
-    try {
-      setIsWorking(true);
-      await demoLogin();
-      const next = search.get("next") ?? "/";
-      window.location.replace(next);
-    } catch (err: any) {
-      setError(err?.message ?? "Demo login failed");
     } finally {
       setIsWorking(false);
     }
@@ -90,15 +76,23 @@ export function LoginClient() {
           <div>
             <label className="block text-sm font-medium mb-1">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))}
-                className="w-full pl-9 pr-3 py-2 border rounded-md bg-white"
+                className="w-full pl-9 pr-11 py-2 border rounded-md bg-white"
                 autoComplete="current-password"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -115,22 +109,6 @@ export function LoginClient() {
           >
             {isWorking ? "Signing in..." : "Login"}
           </button>
-
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={onDemo}
-              disabled={isWorking}
-              className={`w-full px-4 py-2 rounded-md font-semibold border ${
-                isWorking ? "bg-slate-50 text-slate-400 border-slate-200" : "bg-white hover:bg-slate-50 text-slate-900 border-slate-200"
-              }`}
-            >
-              {isWorking ? "Please wait..." : "Demo Login"}
-            </button>
-            <div className="mt-2 text-xs text-slate-500">
-              Demo credentials: <span className="font-semibold">demo</span> / <span className="font-semibold">demo</span>
-            </div>
-          </div>
         </form>
       </div>
     </div>

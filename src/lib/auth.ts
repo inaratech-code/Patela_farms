@@ -62,32 +62,22 @@ export async function loginWithPassword(params: { username: string; password: st
   return { userId: user.id, roleId: user.roleId };
 }
 
-async function getOrCreateAdminRoleId() {
-  const existing = await db.roles.where("name").equals("admin").first();
-  if (typeof existing?.id === "number") return existing.id;
-  const id = await db.roles.add({
-    name: "admin",
-    description: "Full access to all sections",
-    permissions: ["*"],
-    isSystem: true,
-  });
-  if (typeof id !== "number") throw new Error("Failed to create admin role");
-  return id;
-}
-
-export async function demoLogin() {
-  const roleId = await getOrCreateAdminRoleId();
-
-  const username = "demo";
-  let user = await db.users.where("username").equals(username).first();
-  if (!user?.id) {
-    const passwordHash = await sha256Base64("demo");
-    const id = await db.users.add({ username, roleId, passwordHash });
-    user = { id: id as number, username, roleId, passwordHash };
+export async function changePassword(params: {
+  userId: number;
+  currentPassword: string;
+  newPassword: string;
+}) {
+  const { userId, currentPassword, newPassword } = params;
+  if (newPassword.length < 4 || newPassword.length > 20) {
+    throw new Error("New password must be between 4 and 20 characters");
   }
+  const user = await db.users.get(userId);
+  if (!user?.id) throw new Error("User not found");
+  if (!user.passwordHash) throw new Error("This account has no password set");
 
-  if (!user?.id) throw new Error("Failed to create demo user");
-  setSession({ userId: user.id, username: user.username, roleId: user.roleId });
-  return { userId: user.id, roleId: user.roleId };
+  const curHash = await sha256Base64(currentPassword);
+  if (curHash !== user.passwordHash) throw new Error("Current password is incorrect");
+
+  const newHash = await sha256Base64(newPassword);
+  await db.users.update(userId, { passwordHash: newHash });
 }
-

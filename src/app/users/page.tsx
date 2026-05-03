@@ -8,15 +8,19 @@ import { sha256Base64 } from "@/lib/auth";
 
 type PermissionId =
   | "dashboard"
+  | "reports"
   | "outstanding"
   | "inventory.items"
+  | "inventory.consumption"
   | "inventory.stockMovement"
+  | "inventory.lossWastage"
+  | "transactions.overview"
   | "transactions.sales"
-  | "transactions.payments"
   | "transactions.purchases"
   | "transactions.expenses"
   | "accounts.ledger"
   | "accounts.dayBook"
+  | "accounts.payments"
   | "accounts.accounts"
   | "people.customers"
   | "people.suppliers"
@@ -25,6 +29,7 @@ type PermissionId =
   | "alerts"
   | "settings";
 
+/** Matches `sidebarConfig` routes and labels for role-based access configuration. */
 const PERMISSION_GROUPS: Array<{
   id: "top" | "inventory" | "transactions" | "accounts" | "people" | "bottom";
   label: string;
@@ -35,6 +40,7 @@ const PERMISSION_GROUPS: Array<{
     label: "General",
     items: [
       { id: "dashboard", label: "Dashboard" },
+      { id: "reports", label: "Reports" },
       { id: "outstanding", label: "Outstanding" },
     ],
   },
@@ -43,15 +49,17 @@ const PERMISSION_GROUPS: Array<{
     label: "Inventory",
     items: [
       { id: "inventory.items", label: "Items" },
+      { id: "inventory.consumption", label: "Feed usage" },
       { id: "inventory.stockMovement", label: "Stock Movement" },
+      { id: "inventory.lossWastage", label: "Loss / Wastage" },
     ],
   },
   {
     id: "transactions",
     label: "Transactions",
     items: [
+      { id: "transactions.overview", label: "Overview" },
       { id: "transactions.sales", label: "Sales" },
-      { id: "transactions.payments", label: "Payments" },
       { id: "transactions.purchases", label: "Purchases" },
       { id: "transactions.expenses", label: "Expenses" },
     ],
@@ -62,7 +70,8 @@ const PERMISSION_GROUPS: Array<{
     items: [
       { id: "accounts.ledger", label: "Ledger" },
       { id: "accounts.dayBook", label: "Day Book" },
-      { id: "accounts.accounts", label: "Accounts" },
+      { id: "accounts.payments", label: "Payments" },
+      { id: "accounts.accounts", label: "Financial Accounts" },
     ],
   },
   {
