@@ -4,7 +4,12 @@ import { ShoppingCart, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
-import { addLedgerEntry, getOrCreateLedgerAccountId } from "@/lib/ledger";
+import {
+  addLedgerEntry,
+  getOrCreateLedgerAccountId,
+  getOrCreateWalkInCustomerAccountId,
+  WALK_IN_CUSTOMER_NAME,
+} from "@/lib/ledger";
 import { getOrCreateDefaultCashAccountId, sortAccountsForPicker, type PaymentMethod } from "@/lib/accounts";
 import { makeSyncEvent } from "@/lib/syncEvents";
 import { newUid } from "@/lib/uid";
@@ -61,7 +66,11 @@ export default function OrdersPage() {
       const n = s.customerName?.trim();
       if (n) names.add(n);
     }
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
+    names.add(WALK_IN_CUSTOMER_NAME);
+    const rest = Array.from(names)
+      .filter((n) => n !== WALK_IN_CUSTOMER_NAME)
+      .sort((a, b) => a.localeCompare(b));
+    return [WALK_IN_CUSTOMER_NAME, ...rest];
   }, [ledgerCustomers, sales]);
   
   const [activeTab, setActiveTab] = useState<'Sales' | 'Purchases'>('Sales');
@@ -75,7 +84,13 @@ export default function OrdersPage() {
     paymentType: "Cash" | "Credit";
     method: PaymentMethod;
     financialAccountId: number;
-  }>({ itemId: 0, customerName: "", paymentType: "Cash", method: "Cash", financialAccountId: 0 });
+  }>({
+    itemId: 0,
+    customerName: WALK_IN_CUSTOMER_NAME,
+    paymentType: "Cash",
+    method: "Cash",
+    financialAccountId: 0,
+  });
   const [purchaseForm, setPurchaseForm] = useState({
     supplierName: "",
     date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
@@ -149,11 +164,17 @@ export default function OrdersPage() {
     const date = new Date().toISOString();
 
     const isCredit = saleForm.paymentType === "Credit";
-    if (isCredit && !saleForm.customerName.trim()) {
+    const customerNameResolved =
+      saleForm.customerName.trim() || WALK_IN_CUSTOMER_NAME;
+    if (isCredit && !customerNameResolved.trim()) {
       return alert("Customer name is required for Credit sales (for ledger).");
     }
 
     await db.transaction('rw', db.tables, async () => {
+      if (!isCredit && customerNameResolved === WALK_IN_CUSTOMER_NAME) {
+        await getOrCreateWalkInCustomerAccountId();
+      }
+
       // 1. Record Sale
       const sale = {
         uid: newUid(),
@@ -161,7 +182,7 @@ export default function OrdersPage() {
         quantity: qtyParsed,
         totalPrice,
         unitPrice,
-        customerName: saleForm.customerName,
+        customerName: customerNameResolved,
         paymentType: saleForm.paymentType,
         date,
       };
@@ -215,7 +236,7 @@ export default function OrdersPage() {
       let ledgerAccount: any = null;
       let ledgerEntry: any = null;
       if (isCredit) {
-        ledgerAccountId = await getOrCreateLedgerAccountId({ name: saleForm.customerName, type: "Customer" });
+        ledgerAccountId = await getOrCreateLedgerAccountId({ name: customerNameResolved, type: "Customer" });
         const acct = await db.ledgerAccounts.get(ledgerAccountId);
         ledgerAccount = acct?.uid ? { uid: acct.uid, name: acct.name, type: acct.type } : null;
         ledgerEntryId = (await addLedgerEntry({
@@ -268,7 +289,13 @@ export default function OrdersPage() {
     setShowForm(false);
     setSaleQuantityStr("1");
     setSaleUnitPriceStr("");
-    setSaleForm({ itemId: 0, customerName: "", paymentType: "Cash", method: "Cash", financialAccountId: 0 });
+    setSaleForm({
+      itemId: 0,
+      customerName: WALK_IN_CUSTOMER_NAME,
+      paymentType: "Cash",
+      method: "Cash",
+      financialAccountId: 0,
+    });
   };
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
@@ -484,13 +511,12 @@ export default function OrdersPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Customer Name (Optional)</label>
+            <label className="block text-sm font-medium mb-1">Customer</label>
             <select
               value={saleForm.customerName}
               onChange={(e) => setSaleForm({ ...saleForm, customerName: e.target.value })}
               className="w-full px-3 py-2 border rounded-md bg-white"
             >
-              <option value="">Walk-in</option>
               {customerOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}
@@ -734,7 +760,9 @@ export default function OrdersPage() {
                   return (
                     <tr key={sale.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{new Date(sale.date).toLocaleDateString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{sale.customerName || "Walk-in"} ({sale.paymentType})</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                        {sale.customerName?.trim() || WALK_IN_CUSTOMER_NAME} ({sale.paymentType})
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
                         {sale.quantity}x {item?.name || "Unknown"}
                         <span className="block text-xs text-slate-500 mt-0.5">

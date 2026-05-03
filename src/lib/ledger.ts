@@ -3,6 +3,16 @@ import { newUid } from "@/lib/uid";
 
 export type LedgerAccountType = LedgerAccount["type"];
 
+/** Ledger party used for typical cash / counter sales (no named credit customer). */
+export const WALK_IN_CUSTOMER_NAME = "Walk in customer";
+
+export async function getOrCreateWalkInCustomerAccountId() {
+  return getOrCreateLedgerAccountId({
+    name: WALK_IN_CUSTOMER_NAME,
+    type: "Customer",
+  });
+}
+
 function computeNextBalance(prevBalance: number, debit: number, credit: number) {
   return prevBalance + (debit - credit);
 }
