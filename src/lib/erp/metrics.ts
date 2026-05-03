@@ -15,8 +15,16 @@ function monthPrefix(iso: string, monthKey: string) {
   return new Date(iso).toISOString().slice(0, 7) === monthKey;
 }
 
-function dayKeyFromIso(iso: string) {
-  return new Date(iso).toISOString().slice(0, 10);
+/** Calendar YYYY-MM-DD in the user's local timezone (not UTC). */
+export function localDayKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function dayKeyFromStoredInstant(iso: string) {
+  return localDayKey(new Date(iso));
 }
 
 /** SUM(qty * avgCost) — falls back to costPrice when avgCost missing. */
@@ -41,7 +49,9 @@ export function feedExpenseMonth(consumption: ConsumptionLog[], monthKey: string
 }
 
 export function feedExpenseToday(consumption: ConsumptionLog[], todayKey: string) {
-  return consumption.filter((c) => dayKeyFromIso(c.date) === todayKey).reduce((a, c) => a + Number(c.cost ?? 0), 0);
+  return consumption
+    .filter((c) => dayKeyFromStoredInstant(c.date) === todayKey)
+    .reduce((a, c) => a + Number(c.cost ?? 0), 0);
 }
 
 export function lossExpenseMonth(losses: InventoryLoss[], monthKey: string) {
@@ -69,13 +79,12 @@ export function expenseTrend7d(dayBook: DayBookEntry[]) {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(now.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    out.push({ x: key, y: 0 });
+    out.push({ x: localDayKey(d), y: 0 });
   }
   const idx = new Map(out.map((r, i) => [r.x, i]));
   for (const e of dayBook) {
     if (e.type !== "Expense") continue;
-    const k = e.time.slice(0, 10);
+    const k = dayKeyFromStoredInstant(e.time);
     const j = idx.get(k);
     if (typeof j === "number") out[j] = { ...out[j], y: out[j].y + Number(e.amount ?? 0) };
   }
@@ -88,12 +97,11 @@ export function consumptionTrend7d(consumption: ConsumptionLog[]) {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(now.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    out.push({ x: key, y: 0 });
+    out.push({ x: localDayKey(d), y: 0 });
   }
   const idx = new Map(out.map((r, i) => [r.x, i]));
   for (const c of consumption) {
-    const k = dayKeyFromIso(c.date);
+    const k = dayKeyFromStoredInstant(c.date);
     const j = idx.get(k);
     if (typeof j === "number") out[j] = { ...out[j], y: out[j].y + Number(c.cost ?? 0) };
   }
@@ -106,12 +114,11 @@ export function lossTrend7d(losses: InventoryLoss[]) {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(now.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    out.push({ x: key, y: 0 });
+    out.push({ x: localDayKey(d), y: 0 });
   }
   const idx = new Map(out.map((r, i) => [r.x, i]));
   for (const l of losses) {
-    const k = new Date(l.date).toISOString().slice(0, 10);
+    const k = dayKeyFromStoredInstant(l.date);
     const j = idx.get(k);
     if (typeof j === "number") out[j] = { ...out[j], y: out[j].y + Number(l.estimatedCost ?? 0) };
   }

@@ -9,7 +9,7 @@ function formatRs(n: number) {
 export function Sparkline(props: { data: Array<{ x: string; y: number }> }) {
   return (
     <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-      <LineChart data={props.data}>
+      <LineChart data={props.data} margin={{ top: 4, right: 10, bottom: 2, left: 2 }}>
         <Tooltip
           cursor={false}
           content={({ active, payload }) => {

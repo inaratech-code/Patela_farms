@@ -11,6 +11,7 @@ import {
   consumptionTrend7d,
   expenseTrend7d,
   feedExpenseToday,
+  localDayKey,
   lossTrend7d,
   netProfitErp,
 } from "@/lib/erp/metrics";
@@ -44,7 +45,7 @@ export default function Dashboard() {
 
   const isOnline = useSyncExternalStore(subscribeOnlineStatus, getOnlineSnapshot, getOnlineServerSnapshot);
 
-  const todayKey = new Date().toISOString().split("T")[0];
+  const todayKey = localDayKey(new Date());
   const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
 
   const purchasesThisMonth = (purchases ?? [])
@@ -79,15 +80,15 @@ export default function Dashboard() {
   const yesterdayKey = (() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split("T")[0];
+    return localDayKey(d);
   })();
 
   const todaySales = (sales ?? [])
-    .filter((s) => new Date(s.date).toISOString().split("T")[0] === todayKey)
+    .filter((s) => localDayKey(new Date(s.date)) === todayKey)
     .reduce((acc, s) => acc + s.totalPrice, 0);
 
   const yesterdaySales = (sales ?? [])
-    .filter((s) => new Date(s.date).toISOString().split("T")[0] === yesterdayKey)
+    .filter((s) => localDayKey(new Date(s.date)) === yesterdayKey)
     .reduce((acc, s) => acc + s.totalPrice, 0);
 
   const salesDeltaPct =
@@ -102,13 +103,13 @@ export default function Dashboard() {
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(now.getDate() - i);
-      const dayKey = d.toISOString().split("T")[0];
+      const dayKey = localDayKey(d);
       const label = d.toLocaleDateString(undefined, { month: "short", day: "2-digit" });
       result.push({ dayKey, label, total: 0 });
     }
     const index = new Map(result.map((r, idx) => [r.dayKey, idx]));
     for (const s of sales ?? []) {
-      const key = new Date(s.date).toISOString().split("T")[0];
+      const key = localDayKey(new Date(s.date));
       const i = index.get(key);
       if (typeof i === "number") result[i] = { ...result[i], total: result[i].total + s.totalPrice };
     }
