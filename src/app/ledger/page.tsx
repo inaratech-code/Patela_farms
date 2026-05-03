@@ -28,6 +28,17 @@ export default function LedgerPage() {
     return m;
   }, [entries]);
 
+  const debitCreditTotalsByAccountId = useMemo(() => {
+    const m = new Map<number, { debit: number; credit: number }>();
+    for (const e of entries) {
+      const cur = m.get(e.accountId) ?? { debit: 0, credit: 0 };
+      cur.debit += e.debit ?? 0;
+      cur.credit += e.credit ?? 0;
+      m.set(e.accountId, cur);
+    }
+    return m;
+  }, [entries]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const account = {
@@ -105,18 +116,37 @@ export default function LedgerPage() {
                     <div className="mt-1 flex items-center gap-2">
                       <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">{account.type}</span>
                       {(() => {
-                        const bal = typeof account.id === "number" ? (latestBalanceByAccountId.get(account.id)?.balance ?? 0) : 0;
+                        const id = account.id;
+                        const sums =
+                          typeof id === "number" ? debitCreditTotalsByAccountId.get(id) ?? { debit: 0, credit: 0 } : { debit: 0, credit: 0 };
+                        const bal = typeof id === "number" ? (latestBalanceByAccountId.get(id)?.balance ?? 0) : 0;
                         const { label, side } = asDrCr(bal);
-                        if (bal === 0) return <span className="text-xs text-slate-400">No balance</span>;
                         return (
-                          <span
-                            className={`px-2 py-1 text-xs rounded font-semibold ${
-                              side === "dr" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-                            }`}
-                            title={side === "dr" ? "Receivable (Dr)" : "Payable (Cr)"}
-                          >
-                            Rs. {label}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-slate-600">
+                              <span title="Total debits posted to this ledger">
+                                Dr: <span className="font-semibold text-emerald-700">{sums.debit.toLocaleString()}</span>
+                              </span>
+                              <span className="text-slate-300" aria-hidden>
+                                |
+                              </span>
+                              <span title="Total credits posted to this ledger">
+                                Cr: <span className="font-semibold text-rose-700">{sums.credit.toLocaleString()}</span>
+                              </span>
+                            </div>
+                            {bal === 0 ? (
+                              <span className="text-xs text-slate-400">Net: settled</span>
+                            ) : (
+                              <span
+                                className={`px-2 py-1 text-xs rounded font-semibold ${
+                                  side === "dr" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                                }`}
+                                title={side === "dr" ? "Net receivable (Dr)" : "Net payable (Cr)"}
+                              >
+                                Net: Rs. {label}
+                              </span>
+                            )}
+                          </div>
                         );
                       })()}
                     </div>

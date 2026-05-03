@@ -6,8 +6,9 @@ import { db } from "@/lib/db";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
 
-function formatMoney(n: number) {
-  return n === 0 ? "-" : n.toLocaleString();
+/** Line-item debit/credit: always show the number (including 0) so both columns stay visible. */
+function formatLedgerSide(n: number) {
+  return n.toLocaleString();
 }
 
 function formatDate(iso: string) {
@@ -127,14 +128,21 @@ export function LedgerDetailClient(props: { accountId: number }) {
                       <span className="text-xs text-slate-600">{e.opening ? asDrCr(e.opening) : ""}</span>
                     </td>
                     <td className="border border-slate-700 px-3 py-2 text-sm text-right whitespace-nowrap font-semibold text-emerald-700">
-                      {formatMoney(e.debit)}
+                      {formatLedgerSide(e.debit)}
                     </td>
                     <td className="border border-slate-700 px-3 py-2 text-sm text-right whitespace-nowrap font-semibold text-rose-700">
-                      {formatMoney(e.credit)}
+                      {formatLedgerSide(e.credit)}
                     </td>
                     <td className="border border-slate-700 px-3 py-2 text-sm text-center font-semibold">{asDrCr(e.closing)}</td>
                     <td className="border border-slate-700 px-3 py-2 text-sm text-right whitespace-nowrap font-semibold">
-                      {e.closing ? Math.abs(e.closing).toLocaleString() : "-"}
+                      {e.closing === 0 ? (
+                        <span className="text-slate-500">0</span>
+                      ) : (
+                        <>
+                          {Math.abs(e.closing).toLocaleString()}{" "}
+                          <span className="text-xs font-semibold text-slate-600">{asDrCr(e.closing)}</span>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -151,8 +159,9 @@ export function LedgerDetailClient(props: { accountId: number }) {
                     {totals.credit.toLocaleString()}
                   </td>
                   <td className="border border-slate-700 px-3 py-2 text-sm" />
-                  <td className="border border-slate-700 px-3 py-2 text-sm text-right font-semibold">
-                    {Math.abs(latestBalance).toLocaleString()}
+                    <td className="border border-slate-700 px-3 py-2 text-sm text-right font-semibold">
+                    {Math.abs(latestBalance).toLocaleString()}{" "}
+                    <span className="text-xs font-semibold text-slate-700">{asDrCr(latestBalance)}</span>
                   </td>
                 </tr>
 
