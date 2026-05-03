@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 const Sparkline = dynamic(() => import("./_Sparkline").then((m) => m.Sparkline), { ssr: false });
 
 function DeltaText(props: { deltaPct: number }) {
+  if (!Number.isFinite(props.deltaPct) || Math.abs(props.deltaPct) < 0.5) return null;
   const up = props.deltaPct >= 0;
   const value = Math.abs(props.deltaPct).toFixed(0);
   return (
@@ -25,7 +26,8 @@ export type StatCard = {
   icon: React.ComponentType<{ className?: string }>;
   iconBg: string; // tailwind class
   iconFg: string; // tailwind class
-  spark: Array<{ x: string; y: number }>;
+  /** Omit or leave empty to hide the mini chart (e.g. point-in-time balances). */
+  spark?: Array<{ x: string; y: number }>;
 };
 
 export function StatsCards(props: { cards: StatCard[] }) {
@@ -63,9 +65,11 @@ export function StatsCards(props: { cards: StatCard[] }) {
               </div>
             </div>
 
-            <div className="mt-4 h-10">
-              <Sparkline data={c.spark} />
-            </div>
+            {c.spark && c.spark.length > 0 ? (
+              <div className="mt-4 h-10">
+                <Sparkline data={c.spark} />
+              </div>
+            ) : null}
           </div>
 
           <div className="pointer-events-none absolute inset-0 opacity-0 hover:opacity-100 transition-opacity">

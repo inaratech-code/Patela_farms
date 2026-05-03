@@ -200,7 +200,6 @@ export default function Dashboard() {
         icon: Package,
         iconBg: "bg-[#0871b3]/10",
         iconFg: "text-[#0871b3]",
-        spark: spark7,
       },
       {
         id: "todaySales",
@@ -230,7 +229,6 @@ export default function Dashboard() {
         icon: HandCoins,
         iconBg: "bg-[#80a932]/12",
         iconFg: "text-[#80a932]",
-        spark: spark7,
       },
       {
         id: "payable",
@@ -240,7 +238,6 @@ export default function Dashboard() {
         icon: HandCoins,
         iconBg: "bg-rose-500/10",
         iconFg: "text-rose-700",
-        spark: spark7,
       },
       {
         id: "netProfitErp",
@@ -250,7 +247,6 @@ export default function Dashboard() {
         icon: TrendingUp,
         iconBg: "bg-[#80a932]/12",
         iconFg: "text-[#80a932]",
-        spark: spark7,
       },
     ];
   }, [
