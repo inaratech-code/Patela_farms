@@ -4,7 +4,9 @@ import {
   db,
   type DayBookEntry,
   type FinancialAccount,
+  type ConsumptionLog,
   type InventoryItem,
+  type InventoryLoss,
   type LedgerAccount,
   type Payment,
   type Purchase,
@@ -177,6 +179,14 @@ export async function applyEvents(events: SyncEvent[]) {
         });
       };
 
+      const getInventoryItemIdByUid = async (itemUid: string, entityType: string) => {
+        const inv = await db.inventory.where("uid").equals(itemUid).first();
+        if (typeof inv?.id !== "number") {
+          throw new Error(`Cannot apply ${entityType}: inventory item ${itemUid} is missing`);
+        }
+        return inv;
+      };
+
       // Apply minimal event types we currently emit.
       const payload = asRecord(e.payload);
       if (e.entityType === "inventory.item" && e.op === "create") {
@@ -347,8 +357,124 @@ export async function applyEvents(events: SyncEvent[]) {
           }
         }
       }
+      if (e.entityType === "inventory.loss" && e.op === "create") {
+        const loss = asRecord(payload?.loss);
+        const movement = asRecord(payload?.movement);
+        const lossUid = loss ? asString(loss.uid) : undefined;
+        const movementUid = movement ? asString(movement.uid) : undefined;
+        const itemUid = (loss ? asString(loss.itemUid) : undefined) ?? (movement ? asString(movement.itemUid) : undefined);
 
-      await db.outbox.add({ ...e, appliedAt: nowIso, pushedAt: e.pushedAt });
+        if (lossUid && loss && itemUid) {
+          const found = await db.inventoryLosses.where("uid").equals(lossUid).first();
+          if (!found) {
+            const inv = await getInventoryItemIdByUid(itemUid, e.entityType);
+            const quantity = Number(loss.quantity ?? 0) || Math.abs(Number(movement?.delta ?? 0));
+            const delta = asNumber(movement?.delta) ?? -quantity;
+            await db.inventory.update(inv.id!, { quantity: (inv.quantity ?? 0) + delta });
+
+            await db.inventoryLosses.add({
+              ...(loss as AnyRecord),
+              itemId: inv.id!,
+              unit: String(loss.unit ?? inv.unit ?? ""),
+            } as unknown as Omit<InventoryLoss, "id">);
+
+            if (movementUid) {
+              const existingMovement = await db.stockMovement.where("uid").equals(movementUid).first();
+              if (!existingMovement) {
+                await db.stockMovement.add({
+                  uid: movementUid,
+                  itemId: inv.id!,
+                  quantity,
+                  type: "OUT",
+                  reason: "Loss",
+                  date: String(loss.date ?? e.createdAt),
+                });
+              }
+            }
+
+            const dayBookUid = asString(payload?.dayBookUid);
+            if (dayBookUid) {
+              const existingDayBook = await db.dayBook.where("uid").equals(dayBookUid).first();
+              if (!existingDayBook) {
+                const accountId = await ensureFinancialAccountIdByUid(payload?.account);
+                const reason = asString(loss.reason);
+                const lossType = String(loss.lossType ?? "Loss");
+                const description = `Inventory loss (${lossType}): ${quantity} ${String(loss.unit ?? inv.unit ?? "")} ${inv.name}${reason ? ` - ${reason}` : ""}`;
+                const dayBookRow: AnyRecord = {
+                  uid: dayBookUid,
+                  time: String(loss.date ?? e.createdAt),
+                  type: "Expense",
+                  category: "Other",
+                  amount: Number(loss.estimatedCost ?? 0) || 0,
+                  description,
+                  method: "Cash",
+                };
+                if (typeof accountId === "number") dayBookRow.accountId = accountId;
+                await db.dayBook.add(dayBookRow as unknown as Omit<DayBookEntry, "id">);
+              }
+            }
+          }
+        }
+      }
+      if (e.entityType === "inventory.consumption" && e.op === "create") {
+        const log = asRecord(payload?.log);
+        const movement = asRecord(payload?.movement);
+        const logUid = log ? asString(log.uid) : undefined;
+        const movementUid = movement ? asString(movement.uid) : undefined;
+        const itemUid = (log ? asString(log.itemUid) : undefined) ?? (movement ? asString(movement.itemUid) : undefined);
+
+        if (logUid && log && itemUid) {
+          const found = await db.consumptionLogs.where("uid").equals(logUid).first();
+          if (!found) {
+            const inv = await getInventoryItemIdByUid(itemUid, e.entityType);
+            const quantity = Number(log.quantity ?? 0) || Math.abs(Number(movement?.delta ?? 0));
+            const delta = asNumber(movement?.delta) ?? -quantity;
+            await db.inventory.update(inv.id!, { quantity: (inv.quantity ?? 0) + delta });
+
+            await db.consumptionLogs.add({
+              ...(log as AnyRecord),
+              itemId: inv.id!,
+            } as unknown as Omit<ConsumptionLog, "id">);
+
+            if (movementUid) {
+              const existingMovement = await db.stockMovement.where("uid").equals(movementUid).first();
+              if (!existingMovement) {
+                await db.stockMovement.add({
+                  uid: movementUid,
+                  itemId: inv.id!,
+                  quantity,
+                  type: "OUT",
+                  reason: "Usage",
+                  date: String(log.date ?? e.createdAt),
+                });
+              }
+            }
+
+            const dayBookUid = asString(payload?.dayBookUid);
+            if (dayBookUid) {
+              const existingDayBook = await db.dayBook.where("uid").equals(dayBookUid).first();
+              if (!existingDayBook) {
+                const accountId = await ensureFinancialAccountIdByUid(payload?.account);
+                const dayBookRow: AnyRecord = {
+                  uid: dayBookUid,
+                  time: String(log.date ?? e.createdAt),
+                  type: "Expense",
+                  category: "Other",
+                  amount: Number(log.cost ?? 0) || 0,
+                  description: `Consumption (${String(log.category ?? "farm_use")}): ${quantity} ${inv.unit} ${inv.name}`,
+                  method: "Cash",
+                  refType: "consumption",
+                  refId: logUid,
+                };
+                if (typeof accountId === "number") dayBookRow.accountId = accountId;
+                await db.dayBook.add(dayBookRow as unknown as Omit<DayBookEntry, "id">);
+              }
+            }
+          }
+        }
+      }
+
+      await db.outbox.add({ ...e, appliedAt: nowIso, pushedAt: e.pushedAt ?? nowIso });
       existing.add(e.id);
     }
   });
