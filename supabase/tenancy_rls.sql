@@ -10,6 +10,10 @@ create table if not exists public.farms (
   created_at timestamptz not null default now()
 );
 
+-- Ensures INSERT ... RETURNING and WITH CHECK see the same created_by as auth.uid()
+-- even if the client omits created_by (see ensureFarm in app).
+alter table public.farms alter column created_by set default auth.uid();
+
 create table if not exists public.farm_members (
   farm_id uuid not null references public.farms(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -45,6 +49,7 @@ alter table public.events enable row level security;
 -- Members see their farm; creator can read a farm they created before the first farm_members row exists.
 drop policy if exists farms_select on public.farms;
 create policy farms_select on public.farms
+as permissive
 for select to authenticated
 using (
   public.is_farm_member(id)
@@ -53,18 +58,21 @@ using (
 
 drop policy if exists farms_insert on public.farms;
 create policy farms_insert on public.farms
+as permissive
 for insert to authenticated
-with check (created_by = auth.uid());
+with check (auth.uid() is not null and created_by = auth.uid());
 
 -- Members: members can read; owner can insert (simplified)
 drop policy if exists farm_members_select on public.farm_members;
 create policy farm_members_select on public.farm_members
+as permissive
 for select to authenticated
 using (public.is_farm_member(farm_id));
 
 -- Creator must be able to insert the first row before is_farm_member() is true.
 drop policy if exists farm_members_insert on public.farm_members;
 create policy farm_members_insert on public.farm_members
+as permissive
 for insert to authenticated
 with check (
   user_id = auth.uid()
@@ -80,11 +88,13 @@ with check (
 -- Events: only members can read/write within their farm
 drop policy if exists events_select_farm on public.events;
 create policy events_select_farm on public.events
+as permissive
 for select to authenticated
 using (public.is_farm_member(farm_id));
 
 drop policy if exists events_insert_farm on public.events;
 create policy events_insert_farm on public.events
+as permissive
 for insert to authenticated
 with check (public.is_farm_member(farm_id));
 

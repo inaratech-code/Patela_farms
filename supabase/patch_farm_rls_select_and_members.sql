@@ -1,3 +1,5 @@
+-- Legacy patch (partial). Prefer running fix_farms_rls_v2.sql for the full farms + members + grants fix.
+--
 -- Fix "Sync failed: new row violates row-level security policy for table farms"
 -- Typical causes:
 -- 1) INSERT...RETURNING fails SELECT RLS (creator not a member yet).

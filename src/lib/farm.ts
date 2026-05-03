@@ -1,5 +1,19 @@
 import { ensureSupabaseAuth, getSupabaseClient } from "@/lib/supabaseClient";
 
+function formatFarmDbError(prefix: string, err: unknown): string {
+  const e = err as { message?: string; code?: string } | null | undefined;
+  const msg = typeof e?.message === "string" ? e.message : String(err ?? "Unknown error");
+  const code = e?.code;
+  if (
+    code === "42501" ||
+    msg.toLowerCase().includes("row-level security") ||
+    msg.toLowerCase().includes("violates row-level security")
+  ) {
+    return `${prefix}: ${msg} — In Supabase: enable Anonymous sign-in (Auth → Providers), then run the SQL in supabase/fix_farms_rls_v2.sql (SQL Editor).`;
+  }
+  return `${prefix}: ${msg}`;
+}
+
 export const FARM_ID_KEY = "pf.farmId.v1";
 
 export function getFarmId() {
@@ -36,7 +50,7 @@ export async function ensureFarm() {
     .select("id")
     .eq("created_by", user.id)
     .limit(1);
-  if (listErr) throw listErr;
+  if (listErr) throw new Error(formatFarmDbError("Could not list farms", listErr));
 
   let farmId: string;
   if (existingRows?.length) {
@@ -47,7 +61,7 @@ export async function ensureFarm() {
       .insert({ name: "Patela Farm", created_by: user.id })
       .select("id")
       .single();
-    if (farmErr) throw farmErr;
+    if (farmErr) throw new Error(formatFarmDbError("Could not create farm", farmErr));
     farmId = String((farm as { id: string }).id);
   }
 
@@ -58,7 +72,7 @@ export async function ensureFarm() {
       (memErr as { code?: string }).code === "23505" ||
       msg.includes("duplicate key") ||
       msg.includes("unique constraint");
-    if (!isDup) throw memErr;
+    if (!isDup) throw new Error(formatFarmDbError("Could not add farm member", memErr));
   }
 
   setFarmId(farmId);
