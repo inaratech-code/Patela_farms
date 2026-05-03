@@ -49,10 +49,10 @@ export function TopHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 bg-white/90 backdrop-blur border-b border-[#e2e8f0] sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex items-center justify-between min-h-14 h-14 sm:h-16 px-3 sm:px-5 lg:px-8 pt-[env(safe-area-inset-top,0px)] bg-white/90 backdrop-blur border-b border-[#e2e8f0]">
       <button
         type="button"
-        className="md:hidden p-2 rounded-md hover:bg-slate-50 text-slate-600"
+        className="lg:hidden shrink-0 p-2.5 rounded-md hover:bg-slate-50 text-slate-600 [touch-action:manipulation]"
         onClick={sidebar.openMobile}
         aria-label="Open menu"
       >
@@ -60,7 +60,7 @@ export function TopHeader() {
       </button>
 
       <div className="flex flex-1">
-        <form className="flex w-full md:ml-0" action="#" method="GET">
+        <form className="flex w-full min-w-0 lg:ml-0" action="#" method="GET">
           <label htmlFor="search-field" className="sr-only">Search</label>
           <div className="relative w-full text-slate-400 focus-within:text-slate-600">
             <div className="absolute inset-y-0 left-0 flex items-center pointer-events-none">
@@ -68,8 +68,8 @@ export function TopHeader() {
             </div>
             <input
               id="search-field"
-              className="block w-full h-full py-2 pl-8 pr-3 text-sm text-slate-900 placeholder-slate-500 border-transparent focus:outline-none focus:ring-0 focus:border-transparent sm:text-sm bg-transparent"
-              placeholder="Search inventory, ledgers..."
+              className="block w-full min-h-10 py-2 pl-8 pr-2 text-sm text-slate-900 placeholder-slate-500 border-transparent focus:outline-none focus:ring-0 focus:border-transparent sm:text-sm bg-transparent"
+              placeholder="Search…"
               type="search"
               name="search"
             />
@@ -77,7 +77,7 @@ export function TopHeader() {
         </form>
       </div>
 
-      <div className="flex items-center ml-4 space-x-4 md:ml-6">
+      <div className="flex items-center shrink-0 ml-2 sm:ml-4 space-x-2 sm:space-x-4 lg:ml-6">
         <div className={cn(
           "flex items-center px-2.5 py-1 text-xs font-medium rounded-full",
           isOnline ? "bg-alert-green/10 text-alert-green" : "bg-alert-yellow/10 text-alert-yellow"

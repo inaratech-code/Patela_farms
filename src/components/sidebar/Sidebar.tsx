@@ -85,7 +85,7 @@ function MobileSidebarDrawer(props: { open: boolean; onClose: () => void }) {
   return (
     <AnimatePresence>
       {props.open ? (
-        <motion.div className="fixed inset-0 z-50 md:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="fixed inset-0 z-50 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <div className="absolute inset-0 bg-slate-900/50" onClick={props.onClose} />
           <motion.div
             initial={{ x: -320 }}
@@ -104,7 +104,7 @@ function MobileSidebarDrawer(props: { open: boolean; onClose: () => void }) {
 
 export function SidebarDesktop() {
   return (
-    <aside className="hidden md:flex md:flex-col fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200">
+    <aside className="hidden lg:flex lg:flex-col fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200">
       <SidebarContent variant="desktop" />
     </aside>
   );

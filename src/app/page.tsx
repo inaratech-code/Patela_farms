@@ -253,14 +253,14 @@ export default function Dashboard() {
       <HeroSection isOnline={isOnline} />
       <StatsCards cards={statCards} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="lg:col-span-2">
           <SalesChart salesByDay={salesByDay} />
         </div>
         <QuickActions />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="rounded-2xl bg-white border border-[#e2e8f0] shadow-sm p-5">
           <div className="text-sm font-medium text-[#64748b]">Expense trend (7 days)</div>
           <div className="mt-3 h-10">
@@ -313,7 +313,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <RecentActivity items={activityItems} />
         <InventorySnapshot items={lowStockItemsTop5} />
       </div>

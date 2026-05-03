@@ -39,9 +39,11 @@ export function AppShell(props: { children: React.ReactNode }) {
     <SidebarProvider>
       <div className="min-h-full bg-background flex">
         <SidebarDesktop />
-        <div className="flex flex-col flex-1 w-full md:pl-64">
+        <div className="flex flex-col flex-1 w-full lg:pl-64 min-w-0">
           <TopHeader />
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto pb-24 md:pb-8">{props.children}</main>
+          <main className="flex-1 min-h-0 min-w-0 p-3 sm:p-5 lg:p-8 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-8">
+            {props.children}
+          </main>
         </div>
         <MobileBottomNav />
       </div>

@@ -38,7 +38,7 @@ export function MobileBottomNav() {
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/50" onClick={() => setIsOpen(false)} />
           <div className="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-xl border border-slate-200 p-4">
             <div className="flex items-center justify-between">
@@ -73,8 +73,11 @@ export function MobileBottomNav() {
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden bg-white border-t border-slate-200">
-        <div className="grid grid-cols-5">
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white border-t border-slate-200 pb-[env(safe-area-inset-bottom,0px)]"
+        aria-label="Primary"
+      >
+        <div className="grid grid-cols-5 max-w-lg mx-auto w-full">
           {nav.map((item) => {
             const Icon = item.icon;
             const isActive = !item.isAction && pathname === item.href;
